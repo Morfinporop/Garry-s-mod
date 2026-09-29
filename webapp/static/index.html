@@ -1,0 +1,2400 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>FlowVPN</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="/style.css?v=8">
+</head>
+<body>
+
+<div id="app">
+
+  <div id="boot-screen">
+    <div class="boot-logo"><img src="/image/loosa.png" alt="FlowVPN" onerror="this.parentNode.style.display='none'"></div>
+    <div class="boot-spinner" id="boot-spinner"></div>
+    <div class="boot-text" id="boot-text">Подключаемся к FlowVPN…</div>
+    <div class="boot-error" id="boot-error">
+      <div class="boot-text" id="boot-error-text">Не удалось загрузить данные</div>
+      <button class="btn btn-primary" id="boot-retry-btn">Повторить попытку</button>
+    </div>
+  </div>
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo-mark">
+        <img src="/image/loosa.png" alt="FlowVPN">
+      </div>
+      <div class="brand-text">
+        <span class="brand">Самый честный VPN!</span>
+        <span class="brand-sub">на всем рынке.</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="icon-btn" id="theme-toggle" aria-label="Сменить тему">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </button>
+
+      <button class="icon-btn" id="notif-btn" aria-label="Уведомления">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <span class="notif-dot" id="notif-dot" style="display:none;"></span>
+        <div class="notif-panel" id="notif-panel"></div>
+      </button>
+
+      <div class="balance-chip" id="balance-chip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/></svg>
+        <span id="topbar-balance">0 ₽</span>
+      </div>
+    </div>
+  </div>
+
+  <main id="views">
+
+    <section id="view-home" class="view active">
+      <div class="welcome-block">
+        <h1 id="home-greeting">Добро пожаловать!</h1>
+        <span class="badge-chip" id="home-badge">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.8.7-5.1 4.6 1.5 6.7L12 16.9 6 20.3l1.5-6.7L2.4 9l6.8-.7L12 2z"/></svg>
+          <span>Пользователь</span>
+        </span>
+      </div>
+
+      <div class="section" id="home-banner-section"></div>
+      <div class="section" id="home-referral-section"></div>
+      <div class="section" id="home-reviews-section"></div>
+    </section>
+
+    <section id="view-shop" class="view">
+      <div class="welcome-block" style="padding-top:2px;">
+        <h1>Магазин</h1>
+        <span class="badge-chip"><span>Тарифы и подписки</span></span>
+      </div>
+      <div class="section" style="margin-top:16px;" id="shop-banner-section"></div>
+      <div class="section" style="margin-top:0;">
+        <div id="shop-content"></div>
+      </div>
+    </section>
+
+    <section id="view-profile" class="view">
+      <div class="profile-header">
+        <div class="profile-avatar" id="profile-avatar-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
+        </div>
+        <div>
+          <div class="profile-name" id="profile-username">Профиль</div>
+          <div class="profile-id" id="profile-id">ID —</div>
+        </div>
+      </div>
+
+      <div class="section" style="margin-top:0;" id="profile-banner-section"></div>
+
+      <div class="section" style="margin-top:0;">
+        <div class="section-header"><span class="section-title">Мои ключи</span></div>
+        <div id="profile-keys"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-header"><span class="section-title">История операций</span></div>
+        <div id="profile-history"></div>
+        <div class="pager-row" id="profile-history-pager" style="display:none;"></div>
+      </div>
+    </section>
+
+    <section id="view-promo" class="view">
+      <div class="welcome-block" style="padding-top:2px;">
+        <h1>Промокод</h1>
+        <span class="badge-chip"><span>Бонусы и скидки</span></span>
+      </div>
+      <div class="section" style="margin-top:16px;" id="promo-banner-section"></div>
+      <div class="section" style="margin-top:0;" id="promo-status-box"></div>
+
+      <div class="section" style="margin-top:0;">
+        <div class="glass-card">
+          <input type="text" id="promo-input" class="input" placeholder="Введите промокод" autocapitalize="characters" style="margin-bottom:14px;">
+          <button class="btn btn-primary btn-block" id="promo-submit">Активировать</button>
+          <div id="promo-result" class="promo-result"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header"><span class="section-title">Полезно знать</span></div>
+        <div class="promo-info-card">
+          <div class="promo-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></div>
+          <div>
+            <div class="promo-info-title">Где взять промокод?</div>
+            <div class="promo-info-text">Следите за нашим каналом и рассылками в приложении — там регулярно публикуются свежие промокоды с бонусами.</div>
+          </div>
+        </div>
+
+        <div class="promo-info-card">
+          <div class="promo-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/></svg></div>
+          <div>
+            <div class="promo-info-title">Какие бывают бонусы?</div>
+            <div class="promo-info-text">Пополнение баланса деньгами, бесплатные дни VPN на существующий или новый ключ, а также процентная скидка на следующую покупку в магазине.</div>
+          </div>
+        </div>
+
+        <div class="promo-info-card">
+          <div class="promo-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
+          <div>
+            <div class="promo-info-title">Один промокод — один раз</div>
+            <div class="promo-info-text">Каждый конкретный промокод можно активировать только один раз на аккаунт. У некоторых промокодов также ограничено общее число активаций.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-support" class="view">
+      <div class="welcome-block" style="padding-top:2px;">
+        <h1>Поддержка</h1>
+        <span class="badge-chip"><span>Мы на связи 24/7</span></span>
+      </div>
+      <div class="section" style="margin-top:16px;">
+        <div class="contact-row">
+          <div class="contact-card" id="support-contact-btn">
+            <div class="contact-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10z"/></svg></div>
+            <div class="contact-label">Написать</div>
+          </div>
+          <div class="contact-card" id="support-channel-btn">
+            <div class="contact-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></div>
+            <div class="contact-label">Наш канал</div>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-header"><span class="section-title">Частые вопросы</span></div>
+        <div id="faq-list"></div>
+      </div>
+    </section>
+
+    <section id="view-admin" class="view">
+      <div class="welcome-block" style="padding-top:2px;">
+        <h1>Админ-панель</h1>
+        <span class="badge-chip"><span>Управление сервисом</span></span>
+      </div>
+      <div class="section" style="margin-top:16px;" id="admin-content"></div>
+    </section>
+
+  </main>
+
+  <div class="bottom-nav-wrap">
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-tab="home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+        <span>Главная</span>
+      </button>
+      <button class="nav-item" data-tab="shop">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h12l1 13H5L6 7z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>
+        <span>Магазин</span>
+      </button>
+      <button class="nav-item" data-tab="profile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
+        <span>Профиль</span>
+      </button>
+      <button class="nav-item" data-tab="promo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12l-8 8-9-9V4h7l10 8z"/><circle cx="7.5" cy="7.5" r="1" fill="currentColor" stroke="none"/></svg>
+        <span>Промокод</span>
+      </button>
+      <button class="nav-item" data-tab="support">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10z"/></svg>
+        <span>Поддержка</span>
+      </button>
+      <button class="nav-item" data-tab="admin" id="nav-admin" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-4z"/></svg>
+        <span>Админ</span>
+      </button>
+    </nav>
+  </div>
+
+</div>
+
+<!-- МОДАЛКИ -->
+
+<div id="modal-theme" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Цветовая тема</div>
+      <div class="modal-close" data-close="modal-theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+    </div>
+    <div style="font-size:13px;color:var(--text-dim);margin-bottom:14px;">Выберите акцентный цвет интерфейса:</div>
+    <div class="theme-swatches" id="theme-swatches">
+      <div class="theme-swatch" data-color="#ffffff" style="background:#ffffff;"></div>
+      <div class="theme-swatch" data-color="#10b981" style="background:#10b981;"></div>
+      <div class="theme-swatch" data-color="#3b82f6" style="background:#3b82f6;"></div>
+      <div class="theme-swatch" data-color="#ef4444" style="background:#ef4444;"></div>
+      <div class="theme-swatch" data-color="#f59e0b" style="background:#f59e0b;"></div>
+      <div class="theme-swatch" data-color="#8b5cf6" style="background:#8b5cf6;"></div>
+      <div class="theme-swatch" data-color="#06b6d4" style="background:#06b6d4;"></div>
+      <div class="theme-swatch" data-color="#ec4899" style="background:#ec4899;"></div>
+    </div>
+    <div class="theme-custom-row">
+      <input type="color" id="theme-custom-color" value="#ffffff">
+      <span style="font-size:13px;color:var(--text-dim);">Или выберите свой оттенок</span>
+    </div>
+    <button class="btn btn-primary btn-block" id="theme-save-btn">Сохранить</button>
+  </div>
+</div>
+
+<div id="modal-topup" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Пополнение баланса</div>
+      <div class="modal-close" data-close="modal-topup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+    </div>
+    <input type="number" id="topup-amount" class="input" placeholder="Сумма в ₽">
+    <div class="input-hint" id="topup-hint">Минимальная сумма пополнения — 50 ₽</div>
+    <button class="btn btn-primary btn-block" id="topup-confirm">Оплатить</button>
+  </div>
+</div>
+
+<div id="modal-key" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title" id="key-modal-title">Ваш ключ готов</div>
+      <div class="modal-close" data-close="modal-key"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+    </div>
+    <div id="key-modal-meta" style="font-size:13px;color:var(--text-dim);margin-bottom:12px;"></div>
+    <div class="key-value" id="key-modal-value" onclick="copyModalKey()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+      <span id="key-modal-text"></span>
+    </div>
+    <button class="btn btn-primary btn-block" data-close="modal-key">Готово</button>
+  </div>
+</div>
+
+<div id="modal-buy-confirm" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title" id="buy-confirm-title">Подтверждение</div>
+      <div class="modal-close" data-close="modal-buy-confirm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+    </div>
+    <div id="buy-confirm-meta" style="font-size:14px;color:var(--text-dim);margin-bottom:18px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" data-close="modal-buy-confirm">Отмена</button>
+      <button class="btn btn-primary" id="buy-confirm-submit">Купить</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-trial" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Пробный период</div>
+      <div class="modal-close" data-close="modal-trial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+    </div>
+    <div style="font-size:14px;color:var(--text-dim);margin-bottom:18px;">
+      Подпишитесь на наш канал, затем нажмите «Я подписался», чтобы получить бесплатный доступ.
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="trial-subscribe-btn">Подписаться</button>
+      <button class="btn btn-primary" id="trial-check-btn">Я подписался</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-admin-input" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title" id="admin-input-title">Введите значение</div>
+      <div class="modal-close" data-close="modal-admin-input"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+    </div>
+    <div id="admin-input-desc" style="font-size:13px;color:var(--text-dim);margin-bottom:12px;"></div>
+    <input type="text" id="admin-input-field" class="input" placeholder="">
+    <button class="btn btn-primary btn-block" id="admin-input-submit">Подтвердить</button>
+  </div>
+</div>
+
+<div id="modal-review" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Оставить отзыв</div>
+      <div class="modal-close" data-close="modal-review"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+    </div>
+    <div class="star-select" id="review-star-select">
+      <svg data-v="1" viewBox="0 0 24 24" stroke-width="1.6"><path d="M12 2l2.9 6.3 6.8.7-5.1 4.6 1.5 6.7L12 16.9 6 20.3l1.5-6.7L2.4 9l6.8-.7L12 2z"/></svg>
+      <svg data-v="2" viewBox="0 0 24 24" stroke-width="1.6"><path d="M12 2l2.9 6.3 6.8.7-5.1 4.6 1.5 6.7L12 16.9 6 20.3l1.5-6.7L2.4 9l6.8-.7L12 2z"/></svg>
+      <svg data-v="3" viewBox="0 0 24 24" stroke-width="1.6"><path d="M12 2l2.9 6.3 6.8.7-5.1 4.6 1.5 6.7L12 16.9 6 20.3l1.5-6.7L2.4 9l6.8-.7L12 2z"/></svg>
+      <svg data-v="4" viewBox="0 0 24 24" stroke-width="1.6"><path d="M12 2l2.9 6.3 6.8.7-5.1 4.6 1.5 6.7L12 16.9 6 20.3l1.5-6.7L2.4 9l6.8-.7L12 2z"/></svg>
+      <svg data-v="5" viewBox="0 0 24 24" stroke-width="1.6"><path d="M12 2l2.9 6.3 6.8.7-5.1 4.6 1.5 6.7L12 16.9 6 20.3l1.5-6.7L2.4 9l6.8-.7L12 2z"/></svg>
+    </div>
+    <textarea id="review-comment" class="input" placeholder="Ваш комментарий (необязательно)"></textarea>
+    <label class="checkbox-row">
+      <input type="checkbox" id="review-anonymous">
+      Оставить анонимно
+    </label>
+    <button class="btn btn-primary btn-block" id="review-submit">Отправить отзыв</button>
+  </div>
+</div>
+
+<div id="modal-reviews-list" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Все отзывы</div>
+      <div class="modal-close" data-close="modal-reviews-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+    </div>
+    <div id="reviews-list-content"></div>
+  </div>
+</div>
+
+<div id="modal-delete-key" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Удалить ключ?</div>
+      <div class="modal-close" data-close="modal-delete-key"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+    </div>
+    <div class="modal-warning-text">При удалении часть денег за оставшийся срок будет возвращена на баланс. Ключ будет удалён полностью и восстановить его будет нельзя.</div>
+    <div class="modal-key-preview" id="delete-key-preview"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" data-close="modal-delete-key">Отмена</button>
+      <button class="btn btn-danger" id="delete-key-confirm">Удалить</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-banner-add" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title" id="banner-add-title">Добавить баннер</div>
+      <div class="modal-close" data-close="modal-banner-add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+    </div>
+    <div id="banner-add-preview-wrap"></div>
+    <div class="banner-upload-zone" id="banner-add-upload-zone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+      <div class="banner-upload-zone-text">Нажмите, чтобы загрузить картинку или GIF</div>
+    </div>
+    <input type="file" accept="image/*" id="banner-add-file-input" class="banner-file-input">
+    <input type="text" id="banner-add-link-input" class="input" placeholder="Ссылка при нажатии (необязательно)">
+    <input type="text" id="banner-add-expires-input" class="input" placeholder="Показывать до (ГГГГ-ММ-ДД, необязательно)">
+    <button class="btn btn-primary btn-block" id="banner-add-save-btn">Добавить</button>
+  </div>
+</div>
+
+<div id="modal-broadcast-add" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Создать рассылку</div>
+      <div class="modal-close" data-close="modal-broadcast-add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+    </div>
+    <div id="bc-add-preview-wrap"></div>
+    <div class="banner-upload-zone" id="bc-add-upload-zone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+      <div class="banner-upload-zone-text">Картинка или GIF (необязательно)</div>
+    </div>
+    <input type="file" accept="image/*" id="bc-add-file-input" class="banner-file-input">
+    <textarea id="bc-add-text" class="input" placeholder="Текст рассылки"></textarea>
+    <input type="text" id="bc-add-btn-text" class="input" placeholder="Текст кнопки (необязательно)">
+    <input type="text" id="bc-add-btn-url" class="input" placeholder="Ссылка для кнопки (https://...)">
+    <div style="font-size:12px;color:var(--text-dim);margin:4px 0 8px;">0 дней = отправить 1 раз прямо сейчас</div>
+    <input type="number" id="bc-add-duration" class="input" placeholder="Длительность (дней, 0 для разовой)" value="0">
+    <input type="number" id="bc-add-interval" class="input" placeholder="Интервал повтора (часов)" value="24">
+    <button class="btn btn-primary btn-block" id="bc-add-save-btn">Запустить</button>
+  </div>
+</div>
+
+<script>
+const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : {
+  initData: "",
+  ready: () => {},
+  expand: () => {},
+  setHeaderColor: () => {},
+  openLink: (url) => window.open(url, '_blank'),
+  openTelegramLink: (url) => window.open(url, '_blank'),
+  showAlert: (msg) => alert(msg),
+  showConfirm: (msg, cb) => cb(confirm(msg)),
+  HapticFeedback: { impactOccurred: () => {}, notificationOccurred: () => {}, selectionChanged: () => {} }
+};
+
+try { tg.ready(); } catch (e) {}
+try { tg.expand(); } catch (e) {}
+
+function haptic(type = 'impact', param = 'light') {
+  try {
+    if (!tg.HapticFeedback) return;
+    if (type === 'impact') tg.HapticFeedback.impactOccurred(param);
+    else if (type === 'notification') tg.HapticFeedback.notificationOccurred(param);
+    else if (type === 'selection') tg.HapticFeedback.selectionChanged();
+  } catch (e) {}
+}
+
+function getInitData() {
+  if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
+    return window.Telegram.WebApp.initData;
+  }
+  if (window.location.hash) {
+    try {
+      const p = new URLSearchParams(window.location.hash.substring(1));
+      const h = p.get('tgWebAppData');
+      if (h) return h;
+    } catch(e) {}
+  }
+  if (window.location.search) {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const s = p.get('tgWebAppData');
+      if (s) return s;
+    } catch(e) {}
+  }
+  return "";
+}
+
+async function waitForInitData(maxWaitMs = 8000) {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    const data = getInitData();
+    if (data) return data;
+    await new Promise(r => setTimeout(r, 40));
+  }
+  return getInitData();
+}
+
+let currentKeyValue = "";
+let selectedRating = 0;
+let profileHistoryPage = 0;
+let adminUsersPage = 0;
+let adminUsersSearch = "";
+let lastKeysHash = "";
+let lastHistoryHash = "";
+let notifCache = "";
+let currentAccentColor = "#ffffff";
+
+function avatarUrl(uid) {
+  const bucket = Math.floor(Date.now() / 600000);
+  return `/api/avatar/${uid}?v=${bucket}`;
+}
+
+function applyThemeColor(color) {
+  currentAccentColor = color || "#ffffff";
+  document.documentElement.style.setProperty('--accent', currentAccentColor);
+  const isLight = isColorBright(currentAccentColor);
+  document.documentElement.style.setProperty('--accent-text', isLight ? '#000000' : '#ffffff');
+  try { localStorage.setItem('flowvpn_theme_color', currentAccentColor); } catch (e) {}
+
+  document.querySelectorAll('.theme-swatch').forEach(s => {
+    s.classList.toggle('active', s.dataset.color.toLowerCase() === currentAccentColor.toLowerCase());
+  });
+  const customInp = document.getElementById('theme-custom-color');
+  if (customInp) customInp.value = currentAccentColor;
+}
+
+function isColorBright(hex) {
+  hex = hex.replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  const r = parseInt(hex.substr(0, 2), 16) || 0;
+  const g = parseInt(hex.substr(2, 2), 16) || 0;
+  const b = parseInt(hex.substr(4, 2), 16) || 0;
+  return (r * 299 + g * 587 + b * 114) / 1000 > 150;
+}
+
+function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem('flowvpn_theme_color'); } catch (e) {}
+  applyThemeColor(saved || "#ffffff");
+}
+
+document.getElementById("theme-toggle").onclick = (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  haptic('selection');
+  openModal('modal-theme');
+};
+
+document.querySelectorAll('#theme-swatches .theme-swatch').forEach(s => {
+  s.onclick = () => {
+    applyThemeColor(s.dataset.color);
+    haptic('impact', 'light');
+  };
+});
+
+const customColorInput = document.getElementById('theme-custom-color');
+if (customColorInput) {
+  customColorInput.oninput = (e) => applyThemeColor(e.target.value);
+}
+document.getElementById('theme-save-btn').onclick = () => {
+  closeModal('modal-theme');
+  haptic('notification', 'success');
+};
+
+async function api(path, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  const initData = getInitData();
+
+  let res;
+  try {
+    res = await fetch(path, {
+      ...options,
+      cache: "no-store",
+      signal: controller.signal,
+      headers: { "X-Telegram-Init-Data": initData, "Content-Type": "application/json", ...(options.headers || {}) },
+    });
+  } catch (netErr) {
+    if (netErr.name === 'AbortError') {
+      throw new Error("Превышено время ожидания ответа (12 сек).");
+    }
+    throw new Error("Нет соединения с сервером. Проверьте интернет.");
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || `Ошибка ${res.status}`);
+  return data;
+}
+
+function money(n) { return `${n} ₽`; }
+
+function esc(v) {
+  return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+window.esc = esc;
+
+async function withBusy(btn, fn) {
+  if (!btn || btn.dataset.busy === "1") return;
+  btn.dataset.busy = "1";
+  const prev = btn.disabled;
+  btn.disabled = true;
+  try {
+    return await fn();
+  } finally {
+    btn.dataset.busy = "0";
+    btn.disabled = prev;
+  }
+}
+
+function openModal(id) { document.getElementById(id).classList.remove("hidden"); }
+function closeModal(id) { document.getElementById(id).classList.add("hidden"); }
+
+document.querySelectorAll("[data-close]").forEach(el => el.addEventListener("click", () => closeModal(el.dataset.close)));
+
+function askAdminInput({ title, desc = "", placeholder = "", type = "text" }) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("modal-admin-input");
+    document.getElementById("admin-input-title").textContent = title;
+    document.getElementById("admin-input-desc").textContent = desc;
+    const field = document.getElementById("admin-input-field");
+    field.value = ""; field.type = type; field.placeholder = placeholder;
+    openModal("modal-admin-input");
+
+    const submitBtn = document.getElementById("admin-input-submit");
+    const closeBtn = modal.querySelector(".modal-close");
+    let settled = false;
+
+    const finish = (val) => {
+      if (settled) return;
+      settled = true;
+      submitBtn.removeEventListener("click", onSubmit);
+      if (closeBtn) closeBtn.removeEventListener("click", onClose);
+      closeModal("modal-admin-input");
+      resolve(val);
+    };
+    const onSubmit = () => finish(field.value.trim());
+    const onClose = () => finish(null);
+    submitBtn.addEventListener("click", onSubmit);
+    if (closeBtn) closeBtn.addEventListener("click", onClose);
+  });
+}
+
+function skeletonBlock(height = 90, count = 1) {
+  let html = "";
+  for (let i = 0; i < count; i++) html += `<div class="skeleton" style="height:${height}px;"></div>`;
+  return html;
+}
+function skeletonGrid(count = 4, height = 130) {
+  let html = '<div class="skeleton-grid">';
+  for (let i = 0; i < count; i++) html += `<div class="skeleton" style="height:${height}px;margin-bottom:0;"></div>`;
+  return html + "</div>";
+}
+
+function renderEmptyState(container, message, retryFn = null, iconPath = null) {
+  const icon = iconPath || `<circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/>`;
+  container.innerHTML = `
+    <div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>
+      <div>${message}</div>
+      ${retryFn ? `<button class="btn btn-secondary btn-sm" data-retry style="margin-top:10px;">Повторить</button>` : ""}
+    </div>
+  `;
+  if (retryFn) {
+    const btn = container.querySelector("[data-retry]");
+    if (btn) btn.onclick = retryFn;
+  }
+}
+
+document.getElementById("balance-chip").onclick = () => openTopupModal();
+
+async function openTopupModal() {
+  try {
+    const limits = await api("/api/topup/limits");
+    document.getElementById("topup-hint").textContent = `Минимальная сумма — ${limits.min} ₽ (максимум ${limits.max} ₽)`;
+  } catch (e) {}
+  openModal("modal-topup");
+}
+
+const notifBtn = document.getElementById("notif-btn");
+const notifPanel = document.getElementById("notif-panel");
+const notifDot = document.getElementById("notif-dot");
+
+notifBtn.addEventListener("click", async (e) => {
+  e.stopPropagation();
+  const willOpen = !notifPanel.classList.contains("open");
+  notifPanel.classList.toggle("open");
+  if (willOpen) await markNotificationsRead();
+});
+document.addEventListener("click", (e) => {
+  if (!notifPanel.contains(e.target) && e.target !== notifBtn) notifPanel.classList.remove("open");
+});
+
+function daysLeft(dateStr) {
+  const now = new Date();
+  const target = new Date(dateStr.replace(" ", "T"));
+  return Math.ceil((target - now) / (1000 * 60 * 60 * 24));
+}
+
+async function refreshNotifications(profile, keys) {
+  const dynamicItems = [];
+  if (!profile.trial_used) dynamicItems.push({ icon: `<path d="M12 3l1.8 4.8L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.2L12 3z"/>`, text: `Доступен бесплатный пробный период на ${profile.trial_days} дня` });
+  if (profile.balance === 0) dynamicItems.push({ icon: `<circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/>`, text: `Пополните баланс, чтобы приобрести VPN` });
+  keys.forEach(k => {
+    const d = daysLeft(k.expires_at);
+    if (d <= 3 && d >= 0) dynamicItems.push({ icon: `<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>`, text: `Ключ «${k.tariff}» истекает через ${d} дн.` });
+  });
+  if (keys.length === 0) dynamicItems.push({ icon: `<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>`, text: `У вас пока нет активных ключей` });
+
+  let serverItems = [];
+  try { serverItems = await api("/api/notifications"); } catch (e) {}
+
+  const hasUnread = serverItems.some(n => !n.is_read);
+  notifDot.style.display = hasUnread ? "block" : "none";
+  notifDot.classList.toggle("blinking", hasUnread);
+
+  const allItems = [
+    ...serverItems.map(n => ({ icon: `<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>`, text: n.text })),
+    ...dynamicItems,
+  ];
+
+  const renderHash = JSON.stringify(allItems);
+  if (renderHash === notifCache) return;
+  notifCache = renderHash;
+
+  if (!allItems.length) {
+    notifPanel.innerHTML = `<div class="notif-empty">Нет новых уведомлений</div>`;
+  } else {
+    notifPanel.innerHTML = allItems.map(i => `
+      <div class="notif-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${i.icon}</svg>
+        <span>${esc(i.text)}</span>
+      </div>
+    `).join("");
+  }
+}
+
+async function markNotificationsRead() {
+  try { await api("/api/notifications/read-all", { method: "POST" }); } catch (e) {}
+  notifDot.style.display = "none";
+  notifDot.classList.remove("blinking");
+}
+
+let syncInFlight = false;
+async function backgroundSync() {
+  if (syncInFlight || document.hidden) return;
+  syncInFlight = true;
+  try {
+    const profile = await api("/api/profile");
+    const balEl = document.getElementById("topbar-balance");
+    const newBalText = money(profile.balance);
+    if (balEl && balEl.textContent !== newBalText) {
+      balEl.textContent = newBalText;
+      const chip = document.getElementById("balance-chip");
+      if (chip) {
+        chip.classList.add("flash");
+        setTimeout(() => chip.classList.remove("flash"), 600);
+      }
+    }
+
+    let keys = [];
+    if (profile.profile_enabled) {
+      try { keys = await api("/api/keys"); } catch (e) {}
+    }
+    await refreshNotifications(profile, keys);
+
+    const activeView = document.querySelector('.view.active');
+    if (activeView) {
+      const vid = activeView.id;
+      if (vid === 'view-profile' && profile.profile_enabled) {
+        await silentRefreshProfileKeysAndHistory(keys);
+      }
+    }
+  } catch (e) {} finally {
+    syncInFlight = false;
+  }
+}
+
+async function silentRefreshProfileKeysAndHistory(keysAlready) {
+  try {
+    const keys = keysAlready || await api("/api/keys");
+    const khash = JSON.stringify(keys);
+    if (khash !== lastKeysHash) {
+      lastKeysHash = khash;
+      loadProfileKeys();
+    }
+  } catch (e) {}
+
+  try {
+    const data = await api(`/api/history?page=${profileHistoryPage}`);
+    const hhash = JSON.stringify(data);
+    if (hhash !== lastHistoryHash) {
+      lastHistoryHash = hhash;
+      loadProfileHistory();
+    }
+  } catch (e) {}
+}
+
+setInterval(backgroundSync, 8000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) backgroundSync();
+});
+
+function switchTab(tab) {
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+  document.getElementById(`view-${tab}`).classList.add("active");
+  const navBtn = document.querySelector(`.nav-item[data-tab="${tab}"]`);
+  if (navBtn) navBtn.classList.add("active");
+  haptic('selection');
+
+  if (tab === "home") loadHome();
+  if (tab === "shop") loadShop();
+  if (tab === "profile") { profileHistoryPage = 0; loadProfile(); }
+  if (tab === "promo") loadPromoStatus();
+  if (tab === "admin") {
+    adminState.view = "menu";
+    adminUsersSearch = ""; adminUsersPage = 0; adminUserHistoryPage = 0;
+    adminRender();
+  }
+}
+
+document.querySelectorAll(".nav-item").forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
+
+async function loadBanner(placement, containerId) {
+  const box = document.getElementById(containerId);
+  if (!box) return;
+
+  try {
+    const items = await api(`/api/banners/${placement}`);
+    if (!items || !items.length) {
+      box.innerHTML = "";
+      return;
+    }
+
+    if (items.length === 1) {
+      const b = items[0];
+      box.innerHTML = `<div class="banner-card" data-link="${esc(b.link_url)}"><img src="${esc(b.image_url)}" alt="banner"></div>`;
+    } else {
+      box.innerHTML = `
+        <div class="banners-slider">
+          ${items.map(b => `<div class="banner-card" data-link="${esc(b.link_url)}"><img src="${esc(b.image_url)}" alt="banner"></div>`).join("")}
+        </div>
+      `;
+    }
+
+    box.querySelectorAll('.banner-card').forEach(card => {
+      card.onclick = () => {
+        const link = card.dataset.link;
+        if (link) tg.openLink(link);
+      };
+    });
+  } catch (e) {
+    box.innerHTML = "";
+  }
+}
+
+async function loadHome() {
+  document.getElementById("home-reviews-section").innerHTML = skeletonBlock(180);
+
+  const data = await api("/api/profile");
+  const name = data.username ? `@${data.username}` : "друг";
+  document.getElementById("home-greeting").textContent = `Добро пожаловать, ${name}!`;
+  document.getElementById("home-badge").querySelector("span").textContent = data.is_admin ? "Администратор" : "Пользователь";
+  document.getElementById("topbar-balance").textContent = money(data.balance);
+  document.getElementById("nav-admin").style.display = data.is_admin ? "flex" : "none";
+  const chip = document.getElementById("balance-chip");
+  if (chip) chip.style.display = data.topup_enabled === false ? "none" : "";
+
+  let keys = [];
+  if (data.profile_enabled) {
+    try { keys = await api("/api/keys"); } catch (e) {}
+  }
+
+  Promise.allSettled([
+    refreshNotifications(data, keys),
+    loadBanner("home", "home-banner-section"),
+    loadReferralBlock(),
+    loadReviewsBlock(),
+  ]);
+}
+
+async function loadReferralBlock() {
+  const box = document.getElementById("home-referral-section");
+  if (!box) return;
+
+  try {
+    const data = await api("/api/referral");
+    const link = data.link || "";
+
+    box.innerHTML = `
+      <div class="referral-card">
+        <div class="referral-card-content">
+          <div class="referral-title-row">
+            <div class="referral-title-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-5 7-5s7 1.7 7 5"/><path d="M16 4a3 3 0 1 1 0 6"/><path d="M20 20c0-2.5-1.5-4.3-3.5-5"/></svg>
+            </div>
+            <span class="referral-title">Реферальный бонус</span>
+          </div>
+
+          <div class="referral-stats-row">
+            <div class="referral-stat">
+              <div class="referral-stat-value">${data.invited_count}</div>
+              <div class="referral-stat-label">Приглашено</div>
+            </div>
+            <div class="referral-stat">
+              <div class="referral-stat-value">${data.earned} ₽</div>
+              <div class="referral-stat-label">Заработано</div>
+            </div>
+          </div>
+
+          <div class="referral-hint">Получайте <b>${data.bonus_per_referral} ₽</b> за каждого друга, который запустит бота по вашей ссылке!</div>
+
+          ${link ? `
+            <div class="referral-link-row" id="referral-link-row">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+              <span class="referral-link-text">${link}</span>
+            </div>
+          ` : ""}
+        </div>
+      </div>
+    `;
+
+    const linkRow = document.getElementById("referral-link-row");
+    if (linkRow) linkRow.onclick = () => copyReferralLink(link);
+  } catch (e) {
+    box.innerHTML = "";
+  }
+}
+
+function copyReferralLink(link) {
+  if (!link) return;
+  navigator.clipboard.writeText(link).then(() => { haptic('notification', 'success'); tg.showAlert("Реферальная ссылка скопирована!"); });
+}
+window.copyReferralLink = copyReferralLink;
+
+async function handleTrialClaim() {
+  const card = document.getElementById("shop-trial-btn");
+  if (card) card.style.pointerEvents = "none";
+  try {
+    const sub = await api("/api/trial/subscription");
+    if (!sub.subscribed) {
+      if (card) card.style.pointerEvents = "auto";
+      openModal("modal-trial");
+      document.getElementById("trial-subscribe-btn").onclick = () => tg.openTelegramLink(sub.channel_url);
+      const checkBtn = document.getElementById("trial-check-btn");
+      checkBtn.onclick = () => withBusy(checkBtn, async () => {
+        try {
+          const result = await api("/api/trial/claim", { method: "POST" });
+          closeModal("modal-trial");
+          finalizeTrial(result);
+        } catch (e) { tg.showAlert(e.message); }
+      });
+      return;
+    }
+    const result = await api("/api/trial/claim", { method: "POST" });
+    finalizeTrial(result);
+  } catch (e) {
+    if (card) card.style.pointerEvents = "auto";
+    tg.showAlert(e.message);
+  }
+}
+
+function finalizeTrial(result) {
+  if (result.extended) {
+    showKeyModal(
+      "Пробный период добавлен к вашему ключу!",
+      `+${result.days} дней · ${result.tariff}${result.expires_at ? " · до " + result.expires_at : ""}`,
+      result.key
+    );
+  } else {
+    showKeyModal("Пробный период активирован!", `${result.days} дня доступа`, result.key);
+  }
+  markTrialClaimedUI();
+  loadHome().catch(() => {});
+  loadProfileKeys().catch(() => {});
+}
+
+function markTrialClaimedUI() {
+  const card = document.getElementById("shop-trial-btn");
+  const btn = document.getElementById("shop-trial-action-btn");
+  if (card) {
+    card.classList.add("claimed");
+    card.onclick = null;
+    card.style.pointerEvents = "auto";
+  }
+  if (btn) {
+    btn.textContent = "Забрано";
+    btn.disabled = true;
+  }
+}
+
+function starsHtml(rating, size = 17) {
+  let html = '<div class="rating-stars">';
+  for (let i = 1; i <= 5; i++) {
+    const cls = i <= Math.round(rating) ? "star-filled" : "star-empty";
+    html += `<svg class="${cls}" viewBox="0 0 24 24" stroke-width="1.4" width="${size}" height="${size}"><path d="M12 2l2.9 6.3 6.8.7-5.1 4.6 1.5 6.7L12 16.9 6 20.3l1.5-6.7L2.4 9l6.8-.7L12 2z"/></svg>`;
+  }
+  return html + "</div>";
+}
+
+function personIconSvg() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>`;
+}
+
+function heartIconSvg(filled) {
+  if (filled) {
+    return `<svg width="16" height="16" viewBox="0 0 24 24" fill="#ff3b30" stroke="#ff3b30" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12 21s-6.7-4.3-9.3-8.2C1 10 2 6.5 5.3 5.4 7.6 4.6 10 5.6 12 8c2-2.4 4.4-3.4 6.7-2.6C22 6.5 23 10 21.3 12.8 18.7 16.7 12 21 12 21z"/></svg>`;
+  }
+  return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9a9aa2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12 21s-6.7-4.3-9.3-8.2C1 10 2 6.5 5.3 5.4 7.6 4.6 10 5.6 12 8c2-2.4 4.4-3.4 6.7-2.6C22 6.5 23 10 21.3 12.8 18.7 16.7 12 21 12 21z"/></svg>`;
+}
+
+function reviewAvatarHtml(r) {
+  if (r.is_anonymous) return `<div class="review-avatar anon">А</div>`;
+  if (r.user_id) return `<div class="review-avatar" id="rev-avatar-${r.id}">${personIconSvg()}</div>`;
+  return `<div class="review-avatar">${personIconSvg()}</div>`;
+}
+
+function loadReviewAvatars(reviews) {
+  reviews.forEach(r => {
+    if (!r.is_anonymous && r.user_id) {
+      const img = new Image();
+      img.onload = () => {
+        const el = document.getElementById(`rev-avatar-${r.id}`);
+        if (el) el.innerHTML = `<img src="${avatarUrl(r.user_id)}">`;
+      };
+      img.src = avatarUrl(r.user_id);
+    }
+  });
+}
+
+async function loadReviewsBlock() {
+  const box = document.getElementById("home-reviews-section");
+  try {
+    const summary = await api("/api/reviews/summary");
+    let mine = { has_reviewed: false };
+    try { mine = await api("/api/reviews/my"); } catch (e) {}
+
+    const writeBtnHtml = mine.has_reviewed
+      ? `<button class="btn btn-secondary" disabled style="opacity:.5;cursor:not-allowed;">Отзыв уже оставлен</button>`
+      : `<button class="btn btn-secondary" id="write-review-btn">Оставить отзыв</button>`;
+
+    box.innerHTML = `
+      <div class="glass-card reviews-card">
+        <div class="reviews-score">${summary.average || "0.0"}</div>
+        <div class="reviews-count">${summary.count} ${pluralReview(summary.count)}</div>
+        ${starsHtml(summary.average, 20)}
+        <div class="reviews-actions">
+          ${writeBtnHtml}
+          <button class="btn btn-secondary" id="all-reviews-btn">Все отзывы</button>
+        </div>
+      </div>
+    `;
+    if (!mine.has_reviewed) document.getElementById("write-review-btn").onclick = openReviewModal;
+    document.getElementById("all-reviews-btn").onclick = openReviewsListModal;
+  } catch (e) {
+    renderEmptyState(box, "Не удалось загрузить отзывы", () => loadReviewsBlock());
+  }
+}
+
+function pluralReview(n) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "отзыв";
+  if ([2,3,4].includes(mod10) && ![12,13,14].includes(mod100)) return "отзыва";
+  return "отзывов";
+}
+
+function openReviewModal() {
+  selectedRating = 0;
+  document.querySelectorAll("#review-star-select svg").forEach(s => s.classList.remove("active"));
+  document.getElementById("review-comment").value = "";
+  document.getElementById("review-anonymous").checked = false;
+  openModal("modal-review");
+}
+
+document.querySelectorAll("#review-star-select svg").forEach(svg => {
+  svg.addEventListener("click", () => {
+    selectedRating = parseInt(svg.dataset.v, 10);
+    document.querySelectorAll("#review-star-select svg").forEach(s => {
+      s.classList.toggle("active", parseInt(s.dataset.v, 10) <= selectedRating);
+    });
+  });
+});
+
+document.getElementById("review-submit").onclick = () => withBusy(document.getElementById("review-submit"), async () => {
+  if (!selectedRating) { tg.showAlert("Поставьте оценку от 1 до 5"); return; }
+  const comment = document.getElementById("review-comment").value.trim();
+  const anonymous = document.getElementById("review-anonymous").checked;
+  try {
+    await api("/api/reviews", { method: "POST", body: JSON.stringify({ rating: selectedRating, comment, anonymous }) });
+    closeModal("modal-review");
+    haptic('notification', 'success');
+    tg.showAlert("Спасибо за отзыв!");
+    loadReviewsBlock();
+  } catch (e) { tg.showAlert(e.message); }
+});
+
+function renderReviewItemHtml(r, isAdmin) {
+  let heartHtml = "";
+  if (isAdmin) {
+    heartHtml = `
+      <div class="review-heart-row">
+        <button class="review-heart-btn ${r.is_hearted ? "active" : ""}" data-heart="${r.id}" title="Отметить сердечком">
+          ${heartIconSvg(r.is_hearted)}
+        </button>
+        ${r.is_hearted ? `<span class="review-heart-thanks">Спасибо!!!</span>` : ""}
+      </div>
+    `;
+  } else if (r.is_hearted) {
+    heartHtml = `
+      <div class="review-heart-row">
+        <span class="review-heart-static">${heartIconSvg(true)}</span>
+        <span class="review-heart-thanks">Спасибо!!!</span>
+      </div>
+    `;
+  }
+
+  const commentHtml = r.comment ? `<div class="review-item-comment">${esc(r.comment)}</div>` : "";
+
+  return `
+    <div class="review-item" data-id="${r.id}">
+      <div class="review-item-user">
+        ${reviewAvatarHtml(r)}
+        <div class="review-item-name">${esc(r.display_name)}</div>
+        <div class="review-item-top">
+          ${starsHtml(r.rating, 13)}
+          <span class="review-item-date">${r.created_at}</span>
+        </div>
+      </div>
+      ${commentHtml}
+      ${heartHtml}
+      ${isAdmin && r.is_anonymous ? `<div class="review-admin-id">ID автора (видно только админам): ${r.user_id}</div>` : ""}
+      ${isAdmin ? `<button class="review-delete-btn" data-del="${r.id}">Удалить отзыв</button>` : ""}
+    </div>
+  `;
+}
+
+async function openReviewsListModal() {
+  openModal("modal-reviews-list");
+  const box = document.getElementById("reviews-list-content");
+  box.innerHTML = skeletonBlock(80, 3);
+  try {
+    const [reviews, profile] = await Promise.all([api("/api/reviews"), api("/api/profile")]);
+    const isAdmin = profile.is_admin;
+    if (!reviews.length) {
+      renderEmptyState(box, "Пока нет отзывов");
+      return;
+    }
+    box.innerHTML = reviews.map(r => renderReviewItemHtml(r, isAdmin)).join("");
+    loadReviewAvatars(reviews);
+
+    if (isAdmin) {
+      box.querySelectorAll("[data-heart]").forEach(btn => {
+        btn.onclick = async (e) => {
+          e.stopPropagation();
+          try {
+            const r = await api(`/api/admin/reviews/${btn.dataset.heart}/heart`, { method: "POST" });
+            btn.classList.toggle("active", r.is_hearted);
+            btn.innerHTML = heartIconSvg(r.is_hearted);
+            const row = btn.closest(".review-heart-row");
+            let thanks = row.querySelector(".review-heart-thanks");
+            if (r.is_hearted) {
+              if (!thanks) {
+                thanks = document.createElement("span");
+                thanks.className = "review-heart-thanks";
+                thanks.textContent = "Спасибо!!!";
+                row.appendChild(thanks);
+              }
+            } else {
+              if (thanks) thanks.remove();
+            }
+          } catch (e) { tg.showAlert(e.message); }
+        };
+      });
+
+      box.querySelectorAll("[data-del]").forEach(btn => {
+        btn.onclick = () => {
+          tg.showConfirm("Удалить этот отзыв?", async (ok) => {
+            if (!ok) return;
+            try {
+              await api(`/api/admin/reviews/${btn.dataset.del}`, { method: "DELETE" });
+              openReviewsListModal();
+              loadReviewsBlock();
+            } catch (e) { tg.showAlert(e.message); }
+          });
+        };
+      });
+    }
+  } catch (e) {
+    renderEmptyState(box, e.message, openReviewsListModal);
+  }
+}
+
+function rocketIcon() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c2.2 2 3.2 5.2 3.2 8.4 0 2-.5 4-1.2 5.6l-2 3.4-2-3.4c-.7-1.6-1.2-3.6-1.2-5.6C8.8 7.2 9.8 4 12 2z"/><circle cx="12" cy="9.5" r="1.3"/><path d="M9 16l-2 4M15 16l2 4"/></svg>`; }
+function fireIcon() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c4 0 6.5-2.7 6.5-6.2 0-2.8-1.7-4.8-2.8-6.5.1 1.7-.8 2.6-1.7 2.6.6-2.7-.8-5.6-2.7-6.9.3 2.5-1.4 4.3-3.3 6.3-1.1 1.1-1.7 2.8-1.7 4.5 0 3.5 2.5 6.2 5.7 6.2z"/></svg>`; }
+function peopleIcon(n) {
+  const layouts = { 2: [[7,12],[17,12]], 3: [[6,9],[18,9],[12,17]], 4: [[7,7],[17,7],[7,17],[17,17]] };
+  const pts = layouts[n] || layouts[2];
+  const circles = pts.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="3.4" fill="currentColor" stroke="none"/>`).join("");
+  return `<svg viewBox="0 0 24 24">${circles}</svg>`;
+}
+function tariffIconFor(nameOrKey) {
+  const s = (nameOrKey || "").toLowerCase();
+  if (s.includes("проф") || s.includes("pro")) return fireIcon();
+  return rocketIcon();
+}
+function multiIconFor(key) {
+  if (key === "trio") return peopleIcon(3);
+  if (key === "mix") return peopleIcon(4);
+  return peopleIcon(2);
+}
+
+async function loadShop() {
+  loadBanner("shop", "shop-banner-section");
+  const container = document.getElementById("shop-content");
+  container.innerHTML = skeletonGrid(4, 140);
+
+  try {
+    const data = await api("/api/tariffs");
+    if (!data.shop_enabled) {
+      renderEmptyState(container, "Магазин временно отключён", null, `<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 9h8"/>`);
+      return;
+    }
+
+    const trialClaimed = !data.show_trial;
+    let html = "";
+
+    if (data.discount_percent > 0) {
+      html += `<div class="discount-banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12l-8 8-9-9V4h7l10 8z"/></svg>Скидка ${data.discount_percent}% применится к следующей покупке</div>`;
+    }
+
+    html += `
+      <div class="shop-trial-card ${trialClaimed ? "claimed" : ""}" id="shop-trial-btn">
+        <div class="shop-trial-left">
+          <div class="shop-trial-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.8.7-5.1 4.6 1.5 6.7L12 16.9 6 20.3l1.5-6.7L2.4 9l6.8-.7L12 2z"/></svg>
+          </div>
+          <div class="shop-trial-text">
+            <div class="shop-trial-title">Пробный период</div>
+            <div class="shop-trial-subtitle">Пользуйся ${data.trial_days} дней VPN!!!</div>
+          </div>
+        </div>
+        <button class="btn shop-trial-btn" id="shop-trial-action-btn" ${trialClaimed ? "disabled" : ""}>${trialClaimed ? "Забрано" : "Забрать"}</button>
+      </div>`;
+
+    html += '<div class="section-header" style="margin-top:4px;"><span class="section-title">Тарифы</span></div><div class="tariff-grid">';
+    data.tariffs.forEach(t => {
+      html += `
+        <div class="tariff-tile" data-buy="tariff" data-key="${t.key}" data-name="${t.name}" data-price="${t.price}" data-days="${t.days}">
+          <div class="tariff-tile-icon">${tariffIconFor(t.name)}</div>
+          <div class="tariff-tile-name">${t.name}</div>
+          <div class="tariff-tile-days">${t.days} дней</div>
+          ${t.original_price ? `<span class="tariff-tile-price-old">${t.original_price} ₽</span>` : ""}
+          <div class="tariff-tile-price">${t.price} ₽</div>
+        </div>
+      `;
+    });
+    html += '</div>';
+
+    html += '<div class="section-header" style="margin-top:18px;"><span class="section-title">Мульти VPN</span></div><div class="tariff-grid">';
+    data.multi.forEach(t => {
+      html += `
+        <div class="tariff-tile" data-buy="multi" data-key="${t.key}" data-name="${t.title}" data-price="${t.price}" data-days="${t.days}" data-maxusers="${t.max_users}">
+          <div class="tariff-tile-icon">${multiIconFor(t.key)}</div>
+          <div class="tariff-tile-name">${t.title}</div>
+          <div class="tariff-tile-days">${t.days} дней · ${t.max_users} чел</div>
+          ${t.original_price ? `<span class="tariff-tile-price-old">${t.original_price} ₽</span>` : ""}
+          <div class="tariff-tile-price">${t.price} ₽</div>
+        </div>
+      `;
+    });
+    html += '</div>';
+
+    container.innerHTML = html;
+    container.querySelectorAll("[data-buy]").forEach(card => card.addEventListener("click", () => openBuyConfirm(card.dataset)));
+
+    const trialCard = document.getElementById("shop-trial-btn");
+    if (trialCard && !trialClaimed) trialCard.onclick = handleTrialClaim;
+  } catch (e) {
+    renderEmptyState(container, e.message, loadShop);
+  }
+}
+
+let pendingBuy = null;
+function openBuyConfirm(dataset) {
+  pendingBuy = dataset;
+  document.getElementById("buy-confirm-title").textContent = dataset.name;
+  document.getElementById("buy-confirm-meta").textContent = `Цена: ${dataset.price} ₽ · Срок: ${dataset.days} дней` + (dataset.maxusers ? ` · До ${dataset.maxusers} человек` : "");
+  openModal("modal-buy-confirm");
+}
+
+document.getElementById("buy-confirm-submit").onclick = () => withBusy(document.getElementById("buy-confirm-submit"), async () => {
+  if (!pendingBuy) return;
+  try {
+    let result;
+    if (pendingBuy.buy === "tariff") result = await api("/api/buy", { method: "POST", body: JSON.stringify({ tariff_key: pendingBuy.key }) });
+    else result = await api("/api/buy-multi", { method: "POST", body: JSON.stringify({ multi_key: pendingBuy.key }) });
+    pendingBuy = null;
+    closeModal("modal-buy-confirm");
+    showKeyModal("Покупка успешна!", `${result.tariff} · ${result.days} дней`, result.key);
+    loadHome().catch(() => {}); loadShop();
+  } catch (e) { tg.showAlert(e.message); }
+});
+
+async function loadProfile() {
+  loadBanner("profile", "profile-banner-section");
+
+  try {
+    const data = await api("/api/profile");
+    if (!data.profile_enabled) {
+      document.getElementById("profile-keys").innerHTML = "";
+      document.getElementById("profile-history").innerHTML = "";
+      renderEmptyState(document.getElementById("profile-keys"), "Раздел профиля временно отключён");
+      return;
+    }
+
+    document.getElementById("topbar-balance").textContent = money(data.balance);
+    const chip = document.getElementById("balance-chip");
+    if (chip) chip.style.display = data.topup_enabled === false ? "none" : "";
+    document.getElementById("profile-username").textContent = data.username ? `@${data.username}` : "Без username";
+    document.getElementById("profile-id").textContent = `ID ${data.id}`;
+
+    const avatarWrap = document.getElementById("profile-avatar-wrap");
+    const img = new Image();
+    img.onload = () => { avatarWrap.innerHTML = `<img class="avatar-img" src="${avatarUrl(data.id)}">`; };
+    img.src = avatarUrl(data.id);
+  } catch (e) {}
+
+  await loadProfileKeys();
+  await loadProfileHistory();
+}
+
+async function loadProfileKeys() {
+  const keysContainer = document.getElementById("profile-keys");
+  keysContainer.innerHTML = skeletonBlock(120, 2);
+  try {
+    const keys = await api("/api/keys");
+    lastKeysHash = JSON.stringify(keys);
+    if (!keys.length) {
+      renderEmptyState(keysContainer, "Нет активных ключей", null, `<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>`);
+    } else {
+      keysContainer.innerHTML = keys.map(k => {
+        let mark = "Личный";
+        if (k.max_users) mark = `Мульти · ${k.max_users} чел`;
+        else if (k.is_duo) mark = "DUO";
+
+        const canDelete = k.key_type === "purchased";
+        const deleteBtn = canDelete ? `
+          <div class="key-delete-btn" data-delkey="${k.id}" title="Удалить ключ">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </div>
+        ` : "";
+
+        return `
+          <div class="key-card">
+            <div class="key-top">
+              <div class="key-top-left">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <div class="key-tariff">${esc(k.tariff)}</div>
+              </div>
+              <div class="key-tag">${mark}</div>
+            </div>
+            <div class="key-value" onclick="copyKey('${k.key_value.replace(/'/g, "\\'")}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+              <span>${esc(k.key_value)}</span>
+            </div>
+            <div class="key-expires-row">
+              <div class="key-expires">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+                Действует до ${esc(k.expires_at)}
+              </div>
+              ${deleteBtn}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      keysContainer.querySelectorAll("[data-delkey]").forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const key = keys.find(k => String(k.id) === btn.dataset.delkey);
+          if (key) openDeleteKeyModal(key);
+        };
+      });
+    }
+  } catch (e) {
+    renderEmptyState(keysContainer, e.message, loadProfileKeys);
+  }
+}
+
+let pendingDeleteKeyId = null;
+
+function openDeleteKeyModal(key) {
+  pendingDeleteKeyId = key.id;
+  document.getElementById("delete-key-preview").textContent = key.key_value;
+  openModal("modal-delete-key");
+}
+
+document.getElementById("delete-key-confirm").onclick = () => withBusy(document.getElementById("delete-key-confirm"), async () => {
+  if (!pendingDeleteKeyId) return;
+  try {
+    const r = await api(`/api/keys/${pendingDeleteKeyId}`, { method: "DELETE" });
+    pendingDeleteKeyId = null;
+    closeModal("modal-delete-key");
+    haptic('notification', 'success');
+    tg.showAlert(`Ключ удалён. Возвращено на баланс: ${r.refund ?? 0} ₽`);
+    if (typeof r.balance === "number") document.getElementById("topbar-balance").textContent = money(r.balance);
+    loadProfileKeys();
+  } catch (e) { tg.showAlert(e.message); }
+});
+
+async function loadProfileHistory() {
+  const historyContainer = document.getElementById("profile-history");
+  const pager = document.getElementById("profile-history-pager");
+  historyContainer.innerHTML = skeletonBlock(64, 3);
+  try {
+    const data = await api(`/api/history?page=${profileHistoryPage}`);
+    lastHistoryHash = JSON.stringify(data);
+    if (!data.items.length) {
+      renderEmptyState(historyContainer, "Операций нет", null, `<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/>`);
+      pager.style.display = "none";
+    } else {
+      historyContainer.innerHTML = data.items.map(tx => {
+        const positive = tx.amount > 0;
+        return `
+          <div class="tx-card">
+            <div class="tx-left">
+              <div class="tx-icon-wrap">${txIcon(tx.type)}</div>
+              <div><div class="tx-desc">${esc(txLabel(tx))}</div><div class="tx-date">${esc(tx.created_at)}</div></div>
+            </div>
+            <div class="tx-amount ${positive ? "positive" : "negative"}">${positive ? "+" : ""}${tx.amount} ₽</div>
+          </div>
+        `;
+      }).join("");
+
+      const totalPages = Math.max(1, Math.ceil(data.total / data.per_page));
+      pager.style.display = totalPages > 1 ? "flex" : "none";
+      pager.innerHTML = `
+        <button class="pager-btn" id="hist-prev" ${profileHistoryPage === 0 ? "disabled" : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <span class="pager-info">${profileHistoryPage + 1} / ${totalPages}</span>
+        <button class="pager-btn" id="hist-next" ${profileHistoryPage + 1 >= totalPages ? "disabled" : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+      `;
+      const prevBtn = document.getElementById("hist-prev");
+      const nextBtn = document.getElementById("hist-next");
+      if (prevBtn) prevBtn.onclick = () => { if (profileHistoryPage > 0) { profileHistoryPage--; loadProfileHistory(); } };
+      if (nextBtn) nextBtn.onclick = () => { profileHistoryPage++; loadProfileHistory(); };
+    }
+  } catch (e) {
+    renderEmptyState(historyContainer, e.message, loadProfileHistory);
+    pager.style.display = "none";
+  }
+}
+
+function txIcon(type) {
+  const icons = {
+    topup: `<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>`,
+    purchase: `<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>`,
+    purchase_multi: `<circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-5 7-5s7 1.7 7 5"/>`,
+    auto_renew: `<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>`,
+    promo: `<path d="M20 12l-8 8-9-9V4h7l10 8z"/>`,
+    refund: `<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/>`,
+    referral: `<circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-5 7-5s7 1.7 7 5"/><path d="M16 4a3 3 0 1 1 0 6"/><path d="M20 20c0-2.5-1.5-4.3-3.5-5"/>`,
+  };
+  const path = icons[type] || `<circle cx="12" cy="12" r="9"/>`;
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+}
+function txLabel(tx) {
+  const map = { purchase: "Покупка тарифа", purchase_multi: "Покупка мульти", auto_renew: "Автопродление", topup: "Пополнение", promo: "Промокод", admin_gift: "Подарок", admin: "Администратор", refund: "Возврат за ключ", referral: "Реферальный бонус" };
+  return map[tx.type] || tx.description || "Операция";
+}
+
+function copyKey(value) {
+  navigator.clipboard.writeText(value).then(() => { haptic('notification', 'success'); tg.showAlert("Ключ скопирован!"); });
+}
+window.copyKey = copyKey;
+function copyModalKey() { copyKey(currentKeyValue); }
+window.copyModalKey = copyModalKey;
+
+function showKeyModal(title, meta, key) {
+  document.getElementById("key-modal-title").textContent = title;
+  document.getElementById("key-modal-meta").textContent = meta;
+  document.getElementById("key-modal-text").textContent = key;
+  currentKeyValue = key;
+  openModal("modal-key");
+  haptic('notification', 'success');
+}
+
+document.getElementById("topup-confirm").onclick = () => withBusy(document.getElementById("topup-confirm"), async () => {
+  const amount = parseInt(document.getElementById("topup-amount").value, 10);
+  if (!amount || amount <= 0) { tg.showAlert("Введите корректную сумму"); return; }
+  try {
+    const { payment_id, url } = await api("/api/topup", { method: "POST", body: JSON.stringify({ amount }) });
+    closeModal("modal-topup");
+    tg.openLink(url);
+    pollPayment(payment_id);
+  } catch (e) { tg.showAlert(e.message); }
+});
+
+function pollPayment(paymentId) {
+  let attempts = 0;
+  const interval = setInterval(async () => {
+    attempts++;
+    if (attempts > 40) { clearInterval(interval); return; }
+    try {
+      const status = await api(`/api/payment/${paymentId}/status`);
+      if (status.status === "succeeded") {
+        clearInterval(interval);
+        document.getElementById("topbar-balance").textContent = money(status.balance);
+        haptic('notification', 'success');
+        tg.showAlert(`Баланс пополнен! Текущий баланс: ${status.balance} ₽`);
+      }
+    } catch (e) {}
+  }, 3000);
+}
+
+document.getElementById("promo-submit").onclick = () => withBusy(document.getElementById("promo-submit"), async () => {
+  const code = document.getElementById("promo-input").value.trim();
+  const resultBox = document.getElementById("promo-result");
+  if (!code) { tg.showAlert("Введите промокод"); return; }
+  try {
+    const result = await api("/api/promo/use", { method: "POST", body: JSON.stringify({ code }) });
+    let text = "Промокод активирован!";
+    if (result.discount > 0) text += ` На баланс начислено ${result.discount} ₽.`;
+    if (result.bonus_days > 0) text += ` Ключ продлён/выдан на ${result.bonus_days} дней.`;
+    if (result.discount_percent > 0) text += ` Скидка ${result.discount_percent}% на следующую покупку.`;
+    resultBox.textContent = text; resultBox.className = "promo-result show";
+    document.getElementById("promo-input").value = "";
+    haptic('notification', 'success');
+    loadHome().catch(() => {});
+    loadPromoStatus();
+  } catch (e) {
+    resultBox.textContent = e.message; resultBox.className = "promo-result show error";
+  }
+});
+
+async function loadPromoStatus() {
+  const box = document.getElementById("promo-status-box");
+  if (!box) return;
+  try {
+    const status = await api("/api/promo/status");
+    if (status.discount_percent > 0) {
+      box.innerHTML = `
+        <div class="promo-info-card">
+          <div class="promo-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12l-8 8-9-9V4h7l10 8z"/></svg></div>
+          <div>
+            <div class="promo-info-title">Скидка активна!</div>
+            <div class="promo-info-text">У вас есть скидка ${status.discount_percent}% — она автоматически применится к следующей покупке в магазине.</div>
+          </div>
+        </div>
+      `;
+    } else {
+      box.innerHTML = "";
+    }
+  } catch (e) {
+    box.innerHTML = "";
+  }
+}
+
+document.getElementById("support-contact-btn").onclick = () => tg.openTelegramLink("https://t.me/suppflowvpn1_bot");
+document.getElementById("support-channel-btn").onclick = () => tg.openTelegramLink("https://t.me/flowvpntelegram");
+
+const FAQ_ITEMS = [
+  { icon: `<circle cx="12" cy="12" r="9"/><path d="M12 17h.01M12 8a2 2 0 1 1 2 2c-.6.6-1 1-1 2"/>`, title: "Частые вопросы", body: `
+    <p><b>Что такое FlowVPN?</b><br>Коммерческий VPN-сервис для шифрования трафика и защиты конфиденциальности пользователей.</p>
+    <p><b>Сколько устройств на один ключ?</b><br>Тарифы Старт и Профи — 1 подключение. DUO — 2, TRIO — 3, MIX — 4 одновременных подключения.</p>
+    <p><b>Что такое автопродление?</b><br>За 24 часа до окончания подписки с баланса автоматически списывается стоимость тарифа при наличии средств.</p>
+    <p><b>Можно вернуть деньги?</b><br>Да, если ключ не использовался (не было ни одного подключения), в течение 24 часов с момента оплаты — обратитесь в поддержку. Также купленный ключ можно удалить самостоятельно в «Профиле» — часть денег за оставшийся срок вернётся на баланс.</p>
+    <p><b>Ведёте ли вы журналы посещаемых сайтов?</b><br>Нет, содержимое трафика не хранится и не анализируется.</p>
+    <p><b>Лимит активных ключей?</b><br>Не более 3 на один аккаунт одновременно.</p>
+  `},
+  { icon: `<path d="M12 2l8 4v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-4z"/>`, title: "Как подключить", body: `
+    <p><b>Шаг 1.</b> Установите приложение Happ (Android/iOS) или INCY (iPhone) из официального магазина приложений.</p>
+    <p><b>Шаг 2.</b> Скопируйте ключ в разделе «Профиль» — просто нажмите на него.</p>
+    <p><b>Шаг 3.</b> Вставьте ключ в приложение и подключитесь.</p>
+    <p><b>Важно для Happ:</b> откройте настройки приложения, пролистайте вниз до раздела «Пинг» и выберите режим <b>TCP</b> — тогда приложение будет показывать реальный, а не заниженный пинг сервера.</p>
+    <p><b>Важно для INCY:</b> точно так же зайдите в настройки, найдите раздел «Пинг» и переключите на <b>TCP</b>, чтобы видеть корректные значения задержки.</p>
+  `},
+  { icon: `<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/>`, title: "Почему маленький VPN лучше миллионника", body: `
+    <p>Так как мы ещё небольшой VPN-сервис, нас пока не начинают массово DDoS-ить крупные конкуренты и недоброжелатели — а значит, мы стабильно работаем и прослужим вам долго.</p>
+    <p>У нас высокая скорость и сравнительно немного пользователей на серверах — это даёт заметный прирост к пингу: в среднем 40–60 мс ниже, чем у крупных сервисов, в зависимости от вашего интернет-провайдера.</p>
+    <p>Крупные VPN-сервисы с миллионами пользователей часто перегружают сервера в часы пик, из-за чего скорость и пинг заметно проседают. У нас каждый сервер обслуживает ограниченное число подключений, поэтому качество соединения остаётся стабильным.</p>
+    <p>Плюс к этому — маленькие сервисы обычно значительно быстрее реагируют на обращения в поддержку и оперативнее решают технические проблемы.</p>
+  `},
+  { icon: `<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/>`, title: "Правила использования сервиса", body: `
+    <p><b>1. Общие положения.</b> Использование сервиса FlowVPN означает полное согласие с настоящими правилами. Сервис предназначен для лиц старше 18 лет.</p>
+    <p><b>2. Назначение сервиса.</b> Сервис предоставляет технический доступ к VPN-инфраструктуре в целях защиты конфиденциальности.</p>
+    <p><b>3. Запрещённые действия.</b> Запрещены спам, DDoS, вредоносное ПО, любые незаконные действия.</p>
+    <p><b>4. Лимиты и тарифы.</b> Обычные ключи — 1 устройство, Мульти — от 2 до 4. До 3 активных ключей на аккаунт.</p>
+    <div class="law-date">Редакция от 26.09.2026</div>
+  `},
+];
+
+function renderFaq() {
+  const container = document.getElementById("faq-list");
+  if (!container) return;
+  container.innerHTML = FAQ_ITEMS.map((item, i) => `
+    <div class="accordion-item" data-idx="${i}">
+      <div class="accordion-head">
+        <div class="accordion-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${item.icon}</svg></div>
+        <span class="q-title">${item.title}</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <div class="accordion-body"><div class="accordion-body-inner">${item.body}</div></div>
+    </div>
+  `).join("");
+  container.querySelectorAll(".accordion-item").forEach(el => {
+    el.querySelector(".accordion-head").addEventListener("click", () => el.classList.toggle("open"));
+  });
+}
+
+const adminState = { view: "menu", uid: null, currentBannerPlacement: "home" };
+
+function adminBack(to = "menu") { adminState.view = to; adminRender(); }
+function adminHeader(title) {
+  return `<div class="admin-back" onclick="adminBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>${title}</div>`;
+}
+window.adminBack = adminBack;
+
+function adminRender() {
+  const c = document.getElementById("admin-content");
+  if (!c) return;
+  switch (adminState.view) {
+    case "menu": return adminRenderMenu(c);
+    case "stats": return adminRenderStats(c);
+    case "users": return adminRenderUsers(c, adminUsersPage, adminUsersSearch);
+    case "user": return adminRenderUser(c);
+    case "promo": return adminRenderPromo(c);
+    case "broadcast": return adminRenderBroadcast(c);
+    case "gift": return adminRenderGift(c);
+    case "notifyall": return adminRenderNotifyAll(c);
+    case "features": return adminRenderFeatures(c);
+    case "banners": return adminRenderBanners(c);
+  }
+}
+
+const AICON = {
+  wallet: `<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18"/><circle cx="17" cy="15" r="1.3" fill="currentColor" stroke="none"/>`,
+  key: `<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>`,
+  renew: `<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>`,
+  bell: `<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>`,
+  ban: `<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>`,
+  shield: `<path d="M12 2l8 4v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/>`,
+  trash: `<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>`,
+  plus: `<path d="M12 5v14M5 12h14"/>`,
+  stop: `<rect x="6" y="6" width="12" height="12" rx="2"/>`,
+  ruble: `<circle cx="12" cy="12" r="9"/><path d="M10 7h4a3 3 0 0 1 0 6h-4M10 7v10M8 17h5"/>`,
+  clock: `<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>`,
+  calendar: `<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/>`,
+};
+function aIcon(name) {
+  return `<div class="icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${AICON[name] || ""}</svg></div>`;
+}
+
+function adminRenderMenu(c) {
+  const items = [
+    { go: "stats", icon: `<circle cx="12" cy="12" r="9"/><path d="M8 14v-3M12 14V8M16 14v-5"/>`, label: "Статистика" },
+    { go: "users", icon: `<circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-5 7-5s7 1.7 7 5"/><path d="M16 4a3 3 0 1 1 0 6"/><path d="M20 20c0-2.5-1.5-4.3-3.5-5"/>`, label: "Пользователи" },
+    { go: "promo", icon: `<path d="M20 12l-8 8-9-9V4h7l10 8z"/>`, label: "Промокоды" },
+    { go: "broadcast", icon: `<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/>`, label: "Рассылка" },
+    { go: "banners", icon: `<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="M21 15l-5-5-9 9"/>`, label: "Баннеры" },
+    { go: "gift", icon: `<rect x="3" y="8" width="18" height="13" rx="1"/><path d="M12 8v13M3 12h18"/>`, label: "Подарок всем" },
+    { go: "notifyall", icon: `<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>`, label: "Оповещение всем" },
+    { go: "features", icon: `<circle cx="8" cy="12" r="3"/><rect x="2" y="8" width="20" height="8" rx="4"/>`, label: "Функции" },
+  ];
+  c.innerHTML = `<div class="admin-menu-grid">` + items.map(i => `
+    <div class="admin-menu-btn" data-go="${i.go}">
+      <div class="icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${i.icon}</svg></div>
+      <span>${i.label}</span>
+    </div>
+  `).join("") + `</div>`;
+  c.querySelectorAll("[data-go]").forEach(el => el.onclick = () => { adminState.view = el.dataset.go; adminRender(); });
+}
+
+async function adminRenderStats(c) {
+  c.innerHTML = adminHeader("Статистика") + skeletonBlock(180);
+  try {
+    const s = await api("/api/admin/stats");
+    let html = adminHeader("Статистика") + `<div class="glass-card">`;
+    html += `<div class="admin-info-line">Пользователей: <b>${s.users}</b></div>`;
+    html += `<div class="admin-info-line">Активных ключей: <b>${s.keys}</b></div>`;
+    html += `<div class="admin-info-line">Рассылок активно: <b>${s.broadcasts}</b></div>`;
+    html += `<div class="admin-info-line" style="margin-top:10px;">Доход сегодня: <b>${s.revenue.today} ₽</b></div>`;
+    html += `<div class="admin-info-line">Доход за неделю: <b>${s.revenue.week} ₽</b></div>`;
+    html += `<div class="admin-info-line">Доход за месяц: <b>${s.revenue.month} ₽</b></div>`;
+    html += `<div class="admin-info-line">Всего: <b>${s.revenue.total} ₽</b></div>`;
+    html += `<div class="admin-info-line" style="margin-top:10px;">Воронка: заходили <b>${s.funnel.total}</b>, триал <b>${s.funnel.trial}</b>, купили <b>${s.funnel.paid}</b> (${s.funnel.conversion}%)</div>`;
+    html += `</div>`;
+    if (s.tariffs.length) {
+      html += `<div class="section-header" style="margin-top:16px;"><span class="section-title">Популярные тарифы</span></div>`;
+      s.tariffs.forEach(t => { html += `<div class="admin-action-row"><span>${esc(t.tariff)}</span><span class="state">${t.count} шт</span></div>`; });
+    }
+    c.innerHTML = html;
+  } catch (e) {
+    c.innerHTML = adminHeader("Статистика");
+    const box = document.createElement("div");
+    c.appendChild(box);
+    renderEmptyState(box, e.message, () => adminRenderStats(c));
+  }
+}
+
+async function adminRenderUsers(c, page, search) {
+  c.innerHTML = adminHeader("Пользователи") + skeletonBlock(60, 5);
+  try {
+    const data = await api(`/api/admin/users?page=${page}&search=${encodeURIComponent(search)}`);
+    let html = adminHeader("Пользователи");
+    html += `<input type="text" id="admin-user-search" class="input" placeholder="ID, @username или дата (2026-09-29)" value="${esc(search)}">`;
+    html += `<div class="admin-users-hint">Сначала новые пользователи — список отсортирован по дате регистрации</div>`;
+    html += `<div id="admin-users-list"></div>`;
+    html += `<div class="pager-row" id="admin-users-pager"></div>`;
+    c.innerHTML = html;
+
+    renderUsersListData(data, page, search);
+
+    const searchInput = document.getElementById("admin-user-search");
+    let searchTimer;
+    if (searchInput) {
+      searchInput.addEventListener("input", () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+          adminUsersSearch = searchInput.value.trim();
+          adminUsersPage = 0;
+          loadUsersPage(0, adminUsersSearch);
+        }, 300);
+      });
+    }
+  } catch (e) {
+    c.innerHTML = adminHeader("Пользователи");
+    const box = document.createElement("div");
+    c.appendChild(box);
+    renderEmptyState(box, e.message, () => adminRenderUsers(c, page, search));
+  }
+}
+
+async function loadUsersPage(page, search) {
+  const listBox = document.getElementById("admin-users-list");
+  if (!listBox) return;
+  listBox.innerHTML = skeletonBlock(50, 4);
+  try {
+    const data = await api(`/api/admin/users?page=${page}&search=${encodeURIComponent(search)}`);
+    adminUsersPage = page;
+    renderUsersListData(data, page, search);
+  } catch (e) {
+    renderEmptyState(listBox, e.message, () => loadUsersPage(page, search));
+  }
+}
+
+function renderUsersListData(data, page, search) {
+  const listBox = document.getElementById("admin-users-list");
+  const pagerBox = document.getElementById("admin-users-pager");
+  if (!listBox) return;
+
+  const totalPages = Math.max(1, Math.ceil(data.total / data.per_page));
+
+  if (!data.items.length) {
+    renderEmptyState(listBox, "Никого не найдено");
+    if (pagerBox) pagerBox.style.display = "none";
+    return;
+  }
+
+  listBox.innerHTML = data.items.map(u => `
+    <div class="admin-user-row" data-uid="${u.user_id}">
+      <div class="admin-user-row-left">
+        <div class="admin-user-avatar" id="admin-list-avatar-${u.user_id}">${personIconSvg()}</div>
+        <div>
+          <div class="name">${u.username ? esc("@" + u.username) : "без ника"}${u.is_banned ? ' <span class="admin-ban-badge">забанен</span>' : ""}</div>
+          <div class="meta">ID ${u.user_id} · ${u.balance} ₽ · ${u.registered_at ? esc(u.registered_at) : "дата неизвестна"}</div>
+        </div>
+      </div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M9 6l6 6-6 6"/></svg>
+    </div>
+  `).join("");
+
+  data.items.forEach(u => {
+    const img = new Image();
+    img.onload = () => {
+      const el = document.getElementById(`admin-list-avatar-${u.user_id}`);
+      if (el) el.innerHTML = `<img src="${avatarUrl(u.user_id)}">`;
+    };
+    img.src = avatarUrl(u.user_id);
+  });
+
+  listBox.querySelectorAll("[data-uid]").forEach(el => {
+    el.onclick = () => { adminState.uid = parseInt(el.dataset.uid, 10); adminState.view = "user"; adminUserHistoryPage = 0; adminRender(); };
+  });
+
+  if (pagerBox) {
+    if (!search && totalPages > 1) {
+      pagerBox.style.display = "flex";
+      pagerBox.innerHTML = `
+        <button class="pager-btn" id="admin-users-prev" ${page === 0 ? "disabled" : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <span class="pager-info">${page + 1} / ${totalPages}</span>
+        <button class="pager-btn" id="admin-users-next" ${page + 1 >= totalPages ? "disabled" : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+      `;
+      const prevBtn = document.getElementById("admin-users-prev");
+      const nextBtn = document.getElementById("admin-users-next");
+      if (prevBtn) prevBtn.onclick = () => { if (adminUsersPage > 0) loadUsersPage(adminUsersPage - 1, adminUsersSearch); };
+      if (nextBtn) nextBtn.onclick = () => loadUsersPage(adminUsersPage + 1, adminUsersSearch);
+    } else {
+      pagerBox.style.display = "none";
+      pagerBox.innerHTML = "";
+    }
+  }
+}
+
+let adminUserHistoryPage = 0;
+
+async function adminRenderUser(c) {
+  const uid = adminState.uid;
+  c.innerHTML = adminHeader("Пользователь") + skeletonBlock(140);
+  try {
+    const data = await api(`/api/admin/users/${uid}`);
+    const u = data.user;
+
+    let html = adminHeader("Пользователь");
+    html += `<div class="glass-card" style="display:flex;gap:14px;align-items:center;margin-bottom:16px;">`;
+    html += `<div class="profile-avatar" id="admin-avatar-wrap" style="margin:0;">${personIconSvg()}</div>`;
+    html += `<div><div class="profile-name">${u.username ? esc("@" + u.username) : "без ника"}</div><div class="profile-id">ID ${u.user_id} · ${esc(u.registered_at || "дата неизвестна")}</div></div>`;
+    html += `</div>`;
+
+    html += `<div class="glass-card">`;
+    html += `<div class="admin-info-line">Баланс: <b>${u.balance} ₽</b></div>`;
+    html += `<div class="admin-info-line">Регистрация: <b>${esc(u.registered_at || "—")}</b></div>`;
+    html += `<div class="admin-info-line">Статус: <span class="state ${u.is_banned ? "off" : "on"}">${u.is_banned ? "забанен" : "активен"}</span>${u.is_admin ? ' <span class="state on">админ</span>' : ""}</div>`;
+    if (u.ban_reason) html += `<div class="admin-info-line">Причина бана: ${esc(u.ban_reason)}</div>`;
+    html += `<div class="admin-info-line" style="margin-top:8px;">Покупок: <b>${data.purchase_summary.count}</b> на <b>${data.purchase_summary.spent} ₽</b></div>`;
+    html += `</div>`;
+
+    html += `<div class="section-header" style="margin-top:16px;"><span class="section-title">Ключи (${data.keys.length})</span></div>`;
+    if (!data.keys.length) {
+      html += `<div class="empty-state">Нет активных ключей</div>`;
+    } else {
+      data.keys.forEach(k => {
+        const multi = k.max_users ? ` · ${k.max_users} чел` : (k.is_duo ? " · DUO" : "");
+        html += `
+          <div class="admin-action-row" style="cursor:default; padding:10px 14px;">
+            <div style="cursor:pointer; flex:1;" data-viewkey="${k.id}">
+              <div style="font-weight:700;font-size:13.5px;">${esc(k.tariff)}${esc(multi)}</div>
+              <div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">до ${esc(k.expires_at)}</div>
+            </div>
+            <button class="admin-icon-btn" data-delkey="${k.id}" title="Отозвать ключ">${aIcon("trash")}</button>
+          </div>
+        `;
+      });
+    }
+
+    html += `<div class="section-header" style="margin-top:16px;"><span class="section-title">Действия</span></div>`;
+    html += `
+      <div class="admin-menu-grid">
+        <div class="admin-menu-btn" data-act="balance">${aIcon("wallet")}<span>Изменить баланс</span></div>
+        <div class="admin-menu-btn" data-act="key">${aIcon("key")}<span>Выдать ключ</span></div>
+        <div class="admin-menu-btn" data-act="autorenew">${aIcon("renew")}<span>Автопродление: ${data.auto_renew ? "вкл" : "выкл"}</span></div>
+        <div class="admin-menu-btn" data-act="notify">${aIcon("bell")}<span>Отправить уведомление</span></div>
+        <div class="admin-menu-btn" data-act="${u.is_banned ? "unban" : "ban"}">${aIcon(u.is_banned ? "shield" : "ban")}<span>${u.is_banned ? "Разбанить" : "Забанить"}</span></div>
+      </div>
+    `;
+
+    html += `<div class="section-header" style="margin-top:16px;"><span class="section-title">История операций</span></div>`;
+    html += `<div id="admin-user-history"></div>`;
+    html += `<div class="pager-row" id="admin-user-history-pager" style="display:none;"></div>`;
+
+    c.innerHTML = html;
+
+    const avatarWrap = document.getElementById("admin-avatar-wrap");
+    if (avatarWrap) {
+      const img = new Image();
+      img.onload = () => { avatarWrap.innerHTML = `<img class="avatar-img" src="${avatarUrl(uid)}">`; };
+      img.src = avatarUrl(uid);
+    }
+
+    c.querySelectorAll("[data-delkey]").forEach(el => {
+      el.onclick = (e) => {
+        e.stopPropagation();
+        tg.showConfirm("Точно удалить этот ключ у пользователя?", async (ok) => {
+          if (!ok) return;
+          try {
+            await api(`/api/admin/keys/${el.dataset.delkey}`, { method: "DELETE" });
+            adminRenderUser(document.getElementById("admin-content"));
+          } catch (err) { tg.showAlert(err.message); }
+        });
+      };
+    });
+
+    c.querySelectorAll("[data-viewkey]").forEach(el => {
+      el.onclick = () => {
+        const key = data.keys.find(k => String(k.id) === el.dataset.viewkey);
+        if (key && key.key_value) {
+          showKeyModal("Ключ пользователя", `${key.tariff} · до ${key.expires_at}`, key.key_value);
+        } else {
+          tg.showAlert("Значение ключа недоступно");
+        }
+      };
+    });
+
+    c.querySelectorAll("[data-act]").forEach(el => { el.onclick = () => adminUserAction(el.dataset.act, uid, data); });
+    loadAdminUserHistory(uid);
+
+  } catch (e) {
+    c.innerHTML = adminHeader("Пользователь");
+    const box = document.createElement("div");
+    c.appendChild(box);
+    renderEmptyState(box, e.message, () => adminRenderUser(c));
+  }
+}
+
+async function loadAdminUserHistory(uid) {
+  const box = document.getElementById("admin-user-history");
+  const pager = document.getElementById("admin-user-history-pager");
+  if (!box) return;
+  box.innerHTML = skeletonBlock(56, 3);
+  try {
+    const data = await api(`/api/admin/users/${uid}/history?page=${adminUserHistoryPage}`);
+    const totalPages = Math.max(1, Math.ceil(data.total / data.per_page));
+    if (adminUserHistoryPage >= totalPages) {
+      adminUserHistoryPage = totalPages - 1;
+      return loadAdminUserHistory(uid);
+    }
+    if (!data.items.length) {
+      box.innerHTML = `<div class="empty-state">Операций нет</div>`;
+      if (pager) pager.style.display = "none";
+      return;
+    }
+    box.innerHTML = data.items.map(tx => {
+      const positive = tx.amount > 0;
+      return `
+        <div class="tx-card">
+          <div class="tx-left">
+            <div class="tx-icon-wrap">${txIcon(tx.type)}</div>
+            <div><div class="tx-desc">${esc(txLabel(tx))}</div><div class="tx-date">${esc(tx.created_at)}</div></div>
+          </div>
+          <div class="tx-amount ${positive ? "positive" : "negative"}">${positive ? "+" : ""}${tx.amount} ₽</div>
+        </div>
+      `;
+    }).join("");
+    if (pager) {
+      pager.style.display = totalPages > 1 ? "flex" : "none";
+      pager.innerHTML = `
+        <button class="pager-btn" id="ah-prev" ${adminUserHistoryPage === 0 ? "disabled" : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <span class="pager-info">${adminUserHistoryPage + 1} / ${totalPages}</span>
+        <button class="pager-btn" id="ah-next" ${adminUserHistoryPage + 1 >= totalPages ? "disabled" : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+      `;
+      const prev = document.getElementById("ah-prev");
+      const next = document.getElementById("ah-next");
+      if (prev) prev.onclick = () => { if (adminUserHistoryPage > 0) { adminUserHistoryPage--; loadAdminUserHistory(uid); } };
+      if (next) next.onclick = () => { adminUserHistoryPage++; loadAdminUserHistory(uid); };
+    }
+  } catch (e) {
+    renderEmptyState(box, e.message, () => loadAdminUserHistory(uid));
+    if (pager) pager.style.display = "none";
+  }
+}
+
+let adminActionBusy = false;
+async function adminUserAction(action, uid, data) {
+  if (adminActionBusy) return;
+  adminActionBusy = true;
+  try {
+    if (action === "balance") {
+      const val = await askAdminInput({ title: "Изменить баланс", desc: "+50 начислит, -30 спишет", placeholder: "Например +100" });
+      if (!val) return;
+      const amount = parseInt(val, 10);
+      if (!amount) { tg.showAlert("Некорректное число"); return; }
+      await api(`/api/admin/users/${uid}/balance`, { method: "POST", body: JSON.stringify({ amount }) });
+      tg.showAlert("Готово"); adminRenderUser(document.getElementById("admin-content"));
+
+    } else if (action === "key") {
+      const typeStr = await askAdminInput({
+        title: "Тип ключа",
+        desc: "1 = Обычный, 2 = DUO, 3 = TRIO, 4 = MIX",
+        placeholder: "1",
+        type: "number"
+      });
+      if (!typeStr) return;
+      const keyType = parseInt(typeStr, 10);
+      if (![1, 2, 3, 4].includes(keyType)) { tg.showAlert("Некорректный тип ключа"); return; }
+
+      const daysStr = await askAdminInput({
+        title: "Длительность",
+        desc: "Сколько дней?",
+        placeholder: "30",
+        type: "number"
+      });
+      if (!daysStr) return;
+      const days = parseInt(daysStr, 10);
+      if (!days || days <= 0) { tg.showAlert("Некорректное число"); return; }
+
+      const r = await api(`/api/admin/users/${uid}/key`, {
+        method: "POST",
+        body: JSON.stringify({ days, key_type: keyType })
+      });
+      showKeyModal("Ключ выдан!", `${days} дней`, r.key);
+      adminRenderUser(document.getElementById("admin-content"));
+
+    } else if (action === "autorenew") {
+      await api(`/api/admin/users/${uid}/auto-renew/toggle`, { method: "POST" });
+      adminRenderUser(document.getElementById("admin-content"));
+    } else if (action === "notify") {
+      const text = await askAdminInput({ title: "Уведомление", desc: "Текст появится в колокольчике пользователя", placeholder: "Текст сообщения" });
+      if (!text) return;
+      await api(`/api/admin/users/${uid}/notify`, { method: "POST", body: JSON.stringify({ text }) });
+      tg.showAlert("Отправлено");
+    } else if (action === "ban") {
+      const reason = await askAdminInput({ title: "Причина бана", placeholder: "Причина" });
+      if (!reason) return;
+      await api(`/api/admin/users/${uid}/ban`, { method: "POST", body: JSON.stringify({ reason }) });
+      adminRenderUser(document.getElementById("admin-content"));
+    } else if (action === "unban") {
+      await api(`/api/admin/users/${uid}/unban`, { method: "POST" });
+      adminRenderUser(document.getElementById("admin-content"));
+    }
+  } catch (e) { tg.showAlert(e.message); } finally {
+    adminActionBusy = false;
+  }
+}
+
+async function adminRenderPromo(c) {
+  c.innerHTML = adminHeader("Промокоды") + skeletonBlock(60, 3);
+  try {
+    const promos = await api("/api/admin/promo");
+    let html = adminHeader("Промокоды");
+    html += `<div class="admin-menu-grid" style="margin-bottom:16px;"><div class="admin-menu-btn" id="promo-create-btn">${aIcon("plus")}<span>Создать промокод</span></div></div>`;
+    html += `<div id="admin-promo-list"></div>`;
+    c.innerHTML = html;
+
+    const createBtn = document.getElementById("promo-create-btn");
+    if (createBtn) createBtn.onclick = adminCreatePromoFlow;
+
+    const listBox = document.getElementById("admin-promo-list");
+    if (!promos.length) {
+      renderEmptyState(listBox, "Нет промокодов");
+    } else {
+      listBox.innerHTML = promos.map(p => {
+        const limit = p.max_uses === -1 ? "∞" : `${p.used_count}/${p.max_uses}`;
+        const bonus = p.discount > 0 ? `${p.discount} ₽` : (p.bonus_days > 0 ? `${p.bonus_days} дн` : `-${p.discount_percent}%`);
+        return `<div class="admin-action-row" data-code="${esc(p.code)}"><span>${esc(p.code)} — ${esc(bonus)}</span><span class="state">[${limit}]</span><span class="admin-icon-btn" title="Удалить">${aIcon("trash")}</span></div>`;
+      }).join("");
+
+      listBox.querySelectorAll("[data-code]").forEach(el => {
+        el.onclick = () => {
+          tg.showConfirm(`Удалить промокод ${el.dataset.code}?`, async (ok) => {
+            if (!ok) return;
+            try { await api(`/api/admin/promo/${el.dataset.code}`, { method: "DELETE" }); adminRenderPromo(c); }
+            catch (e) { tg.showAlert(e.message); }
+          });
+        };
+      });
+    }
+  } catch (e) {
+    c.innerHTML = adminHeader("Промокоды");
+    const box = document.createElement("div");
+    c.appendChild(box);
+    renderEmptyState(box, e.message, () => adminRenderPromo(c));
+  }
+}
+
+async function adminCreatePromoFlow() {
+  try {
+    const code = await askAdminInput({ title: "Код промокода", placeholder: "LATIN123" });
+    if (!code) return;
+    const typeStr = await askAdminInput({ title: "Тип бонуса", desc: "1 — ₽ на баланс, 2 — дни VPN, 3 — скидка %", placeholder: "1, 2 или 3", type: "number" });
+    const bonus_type = parseInt(typeStr, 10);
+    if (![1, 2, 3].includes(bonus_type)) { tg.showAlert("Некорректный тип"); return; }
+    const valueStr = await askAdminInput({ title: "Значение", placeholder: "Например 100", type: "number" });
+    const value = parseInt(valueStr, 10);
+    if (!value || value < 1) { tg.showAlert("Некорректное значение"); return; }
+    const maxUsesStr = await askAdminInput({ title: "Лимит использований", desc: "-1 = безлимит", placeholder: "-1" });
+    const max_uses = parseInt(maxUsesStr, 10);
+    if (isNaN(max_uses) || (max_uses !== -1 && max_uses < 1)) { tg.showAlert("Некорректный лимит"); return; }
+    await api("/api/admin/promo", { method: "POST", body: JSON.stringify({ code, bonus_type, value, max_uses }) });
+    tg.showAlert("Промокод создан!"); adminRenderPromo(document.getElementById("admin-content"));
+  } catch (e) { tg.showAlert(e.message); }
+}
+
+async function adminRenderBroadcast(c) {
+  c.innerHTML = adminHeader("Рассылка") + skeletonBlock(60, 2);
+  try {
+    const active = await api("/api/admin/broadcast/active");
+    let html = adminHeader("Рассылка");
+    html += `
+      <div class="admin-menu-grid" style="margin-bottom:16px;">
+        <div class="admin-menu-btn" id="bc-create-btn">${aIcon("plus")}<span>Новая рассылка (файл/текст/1 раз)</span></div>
+        <div class="admin-menu-btn" id="bc-stop-btn">${aIcon("stop")}<span>Остановить все (${active.length})</span></div>
+      </div>
+    `;
+    if (active.length) {
+      html += `<div class="section-header"><span class="section-title">Активные рассылки</span></div>`;
+      active.forEach(b => {
+        html += `
+          <div class="admin-action-row" style="padding:10px 14px;">
+            <div style="flex:1;">
+              <div style="font-weight:700;font-size:13.5px;">#${b.id} ${esc(b.text)}</div>
+              <div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">каждые ${b.interval_hours}ч · ${b.duration_days ? b.duration_days + 'д' : 'разовая'}</div>
+            </div>
+            <button class="admin-icon-btn" data-stopbc="${b.id}" title="Остановить">${aIcon("stop")}</button>
+          </div>
+        `;
+      });
+    } else {
+      html += `<div class="empty-state">Активных рассылок нет</div>`;
+    }
+    c.innerHTML = html;
+
+    const createBtn = document.getElementById("bc-create-btn");
+    const stopBtn = document.getElementById("bc-stop-btn");
+    if (createBtn) createBtn.onclick = openBroadcastAddModal;
+    if (stopBtn) stopBtn.onclick = async () => {
+      try { await api("/api/admin/broadcast/stop-all", { method: "POST" }); adminRenderBroadcast(c); }
+      catch (e) { tg.showAlert(e.message); }
+    };
+
+    c.querySelectorAll("[data-stopbc]").forEach(el => {
+      el.onclick = async (e) => {
+        e.stopPropagation();
+        try {
+          await api(`/api/admin/broadcast/${el.dataset.stopbc}/stop`, { method: "POST" });
+          adminRenderBroadcast(c);
+        } catch (err) { tg.showAlert(err.message); }
+      };
+    });
+  } catch (e) {
+    c.innerHTML = adminHeader("Рассылка");
+    const box = document.createElement("div");
+    c.appendChild(box);
+    renderEmptyState(box, e.message, () => adminRenderBroadcast(c));
+  }
+}
+
+let broadcastAddFile = null;
+function openBroadcastAddModal() {
+  broadcastAddFile = null;
+  document.getElementById("bc-add-preview-wrap").innerHTML = "";
+  document.getElementById("bc-add-text").value = "";
+  document.getElementById("bc-add-btn-text").value = "";
+  document.getElementById("bc-add-btn-url").value = "";
+  document.getElementById("bc-add-duration").value = "0";
+  document.getElementById("bc-add-interval").value = "24";
+  openModal("modal-broadcast-add");
+}
+
+const bcUploadZone = document.getElementById("bc-add-upload-zone");
+if (bcUploadZone) {
+  bcUploadZone.onclick = () => document.getElementById("bc-add-file-input").click();
+}
+const bcFileInput = document.getElementById("bc-add-file-input");
+if (bcFileInput) {
+  bcFileInput.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    broadcastAddFile = file;
+    const reader = new FileReader();
+    reader.onload = () => {
+      document.getElementById("bc-add-preview-wrap").innerHTML = `<div class="banner-preview"><img src="${reader.result}"></div>`;
+    };
+    reader.readAsDataURL(file);
+  };
+}
+
+document.getElementById("bc-add-save-btn").onclick = () => withBusy(document.getElementById("bc-add-save-btn"), async () => {
+  const text = document.getElementById("bc-add-text").value.trim();
+  if (!text) { tg.showAlert("Введите текст рассылки"); return; }
+  const btn_text = document.getElementById("bc-add-btn-text").value.trim() || null;
+  const btn_url = document.getElementById("bc-add-btn-url").value.trim() || null;
+  const duration_days = parseInt(document.getElementById("bc-add-duration").value, 10) || 0;
+  const interval_hours = parseInt(document.getElementById("bc-add-interval").value, 10) || 24;
+
+  let photo_url = null;
+  if (broadcastAddFile) {
+    const fd = new FormData();
+    fd.append("file", broadcastAddFile);
+    const initData = getInitData();
+    const res = await fetch("/api/admin/broadcast/upload", {
+      method: "POST",
+      headers: { "X-Telegram-Init-Data": initData },
+      body: fd,
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.detail || "Ошибка загрузки файла");
+    photo_url = d.file_url;
+  }
+
+  try {
+    await api("/api/admin/broadcast", {
+      method: "POST",
+      body: JSON.stringify({ text, photo_url, btn_text, btn_url, duration_days, interval_hours })
+    });
+    closeModal("modal-broadcast-add");
+    tg.showAlert("Рассылка запущена!");
+    adminRenderBroadcast(document.getElementById("admin-content"));
+  } catch (e) { tg.showAlert(e.message); }
+});
+
+function adminRenderGift(c) {
+  let html = adminHeader("Подарок всем");
+  html += `
+    <div class="admin-menu-grid">
+      <div class="admin-menu-btn" data-gift="1">${aIcon("ruble")}<span>Рубли на баланс</span></div>
+      <div class="admin-menu-btn" data-gift="2">${aIcon("clock")}<span>Часы VPN</span></div>
+      <div class="admin-menu-btn" data-gift="3">${aIcon("calendar")}<span>Дни VPN</span></div>
+    </div>
+  `;
+  c.innerHTML = html;
+  c.querySelectorAll("[data-gift]").forEach(el => {
+    el.onclick = async () => {
+      const gift_type = parseInt(el.dataset.gift, 10);
+      const labels = { 1: "Сумма в ₽", 2: "Количество часов", 3: "Количество дней" };
+      const valStr = await askAdminInput({ title: "Подарок всем", desc: labels[gift_type], placeholder: "Число", type: "number" });
+      const value = parseInt(valStr, 10);
+      if (!value || value <= 0) { tg.showAlert("Некорректное число"); return; }
+      tg.showConfirm("Отправить подарок всем пользователям?", async (ok) => {
+        if (!ok) return;
+        try {
+          const r = await api("/api/admin/gift-all", { method: "POST", body: JSON.stringify({ gift_type, value }) });
+          tg.showAlert(`Готово. Успешно: ${r.success}, ошибок: ${r.failed}`);
+        } catch (e) { tg.showAlert(e.message); }
+      });
+    };
+  });
+}
+
+function adminRenderNotifyAll(c) {
+  let html = adminHeader("Оповещение всем");
+  html += `<div class="glass-card"><textarea id="notify-all-text" class="input" placeholder="Текст появится у всех пользователей в колокольчике"></textarea><button class="btn btn-primary btn-block" id="notify-all-send">Отправить</button></div>`;
+  c.innerHTML = html;
+  const sendBtn = document.getElementById("notify-all-send");
+  if (sendBtn) {
+    sendBtn.onclick = async () => {
+      const text = document.getElementById("notify-all-text").value.trim();
+      if (!text) { tg.showAlert("Введите текст"); return; }
+      tg.showConfirm("Отправить всем пользователям?", async (ok) => {
+        if (!ok) return;
+        try {
+          const r = await api("/api/admin/notify-all", { method: "POST", body: JSON.stringify({ text }) });
+          tg.showAlert(`Отправлено! Доставлено: ${r.success} из ${r.total}`);
+        } catch (e) { tg.showAlert(e.message); }
+      });
+    };
+  }
+}
+
+async function adminRenderFeatures(c) {
+  c.innerHTML = adminHeader("Функции") + skeletonBlock(50, 3);
+  try {
+    const features = await api("/api/admin/features");
+    let html = adminHeader("Функции");
+    features.forEach(f => {
+      html += `<div class="admin-action-row" data-feature="${f.key}"><span>${esc(f.label)}</span><span class="state ${f.enabled ? "on" : "off"}">${f.enabled ? "Вкл" : "Выкл"}</span></div>`;
+    });
+    c.innerHTML = html;
+    c.querySelectorAll("[data-feature]").forEach(el => {
+      el.onclick = async () => {
+        try { await api(`/api/admin/features/${el.dataset.feature}/toggle`, { method: "POST" }); adminRenderFeatures(c); }
+        catch (e) { tg.showAlert(e.message); }
+      };
+    });
+  } catch (e) {
+    c.innerHTML = adminHeader("Функции");
+    const box = document.createElement("div");
+    c.appendChild(box);
+    renderEmptyState(box, e.message, () => adminRenderFeatures(c));
+  }
+}
+
+const BANNER_LABELS = { home: "Главная", shop: "Магазин", profile: "Профиль", promo: "Промокод" };
+
+async function adminRenderBanners(c) {
+  c.innerHTML = adminHeader("Баннеры") + skeletonBlock(50, 4);
+  try {
+    const banners = await api("/api/admin/banners");
+    let html = adminHeader("Баннеры");
+    html += `<div class="admin-info-line" style="margin-bottom:14px;">Можно добавлять по несколько баннеров на каждый раздел (листаются слайдером).</div>`;
+
+    const placements = ["home", "shop", "profile", "promo"];
+    placements.forEach(p => {
+      const list = banners.filter(b => b.placement === p);
+      html += `
+        <div class="section-header" style="margin-top:16px;">
+          <span class="section-title">${BANNER_LABELS[p]} (${list.length})</span>
+          <button class="link-btn" data-addbanner="${p}">+ Добавить</button>
+        </div>
+      `;
+      if (!list.length) {
+        html += `<div class="empty-state" style="padding:14px;">Нет баннеров в разделе</div>`;
+      } else {
+        list.forEach(b => {
+          html += `
+            <div class="admin-action-row" style="padding:10px 14px;">
+              <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+                <img src="${esc(b.image_url)}" style="width:48px;height:32px;border-radius:6px;object-fit:cover;">
+                <div style="font-size:12px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                  ${b.link_url ? esc(b.link_url) : "Без ссылки"}
+                </div>
+              </div>
+              <span class="state ${b.enabled ? "on" : "off"}" data-togglebanner="${b.id}">${b.enabled ? "Вкл" : "Выкл"}</span>
+              <button class="admin-icon-btn" data-delbanner="${b.id}">${aIcon("trash")}</button>
+            </div>
+          `;
+        });
+      }
+    });
+
+    c.innerHTML = html;
+
+    c.querySelectorAll("[data-addbanner]").forEach(btn => {
+      btn.onclick = () => openBannerAddModal(btn.dataset.addbanner);
+    });
+    c.querySelectorAll("[data-togglebanner]").forEach(el => {
+      el.onclick = async () => {
+        try {
+          await api(`/api/admin/banners/${el.dataset.togglebanner}/toggle`, { method: "POST" });
+          adminRenderBanners(c);
+        } catch (e) { tg.showAlert(e.message); }
+      };
+    });
+    c.querySelectorAll("[data-delbanner]").forEach(btn => {
+      btn.onclick = () => {
+        tg.showConfirm("Удалить этот баннер?", async (ok) => {
+          if (!ok) return;
+          try {
+            await api(`/api/admin/banners/${btn.dataset.delbanner}`, { method: "DELETE" });
+            adminRenderBanners(c);
+          } catch (e) { tg.showAlert(e.message); }
+        });
+      };
+    });
+  } catch (e) {
+    c.innerHTML = adminHeader("Баннеры");
+    const box = document.createElement("div");
+    c.appendChild(box);
+    renderEmptyState(box, e.message, () => adminRenderBanners(c));
+  }
+}
+
+let bannerAddFile = null;
+let currentBannerAddPlacement = "home";
+
+function openBannerAddModal(placement) {
+  currentBannerAddPlacement = placement;
+  bannerAddFile = null;
+  document.getElementById("banner-add-title").textContent = `Добавить баннер «${BANNER_LABELS[placement]}»`;
+  document.getElementById("banner-add-preview-wrap").innerHTML = "";
+  document.getElementById("banner-add-link-input").value = "";
+  document.getElementById("banner-add-expires-input").value = "";
+  openModal("modal-banner-add");
+}
+
+const bannerAddUploadZone = document.getElementById("banner-add-upload-zone");
+if (bannerAddUploadZone) {
+  bannerAddUploadZone.onclick = () => document.getElementById("banner-add-file-input").click();
+}
+const bannerAddFileInput = document.getElementById("banner-add-file-input");
+if (bannerAddFileInput) {
+  bannerAddFileInput.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    bannerAddFile = file;
+    const reader = new FileReader();
+    reader.onload = () => {
+      document.getElementById("banner-add-preview-wrap").innerHTML = `<div class="banner-preview"><img src="${reader.result}"></div>`;
+    };
+    reader.readAsDataURL(file);
+  };
+}
+
+document.getElementById("banner-add-save-btn").onclick = () => withBusy(document.getElementById("banner-add-save-btn"), async () => {
+  if (!bannerAddFile) { tg.showAlert("Выберите картинку или GIF"); return; }
+  try {
+    const fd = new FormData();
+    fd.append("file", bannerAddFile);
+    const initData = getInitData();
+    const res = await fetch(`/api/admin/banners/${currentBannerAddPlacement}/upload`, {
+      method: "POST",
+      headers: { "X-Telegram-Init-Data": initData },
+      body: fd,
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.detail || "Ошибка загрузки файла");
+    const image_url = d.image_url;
+
+    const link_url = document.getElementById("banner-add-link-input").value.trim();
+    const expires_at = document.getElementById("banner-add-expires-input").value.trim() || null;
+
+    await api(`/api/admin/banners/${currentBannerAddPlacement}`, {
+      method: "POST",
+      body: JSON.stringify({ image_url, link_url, expires_at })
+    });
+    closeModal("modal-banner-add");
+    tg.showAlert("Баннер добавлен!");
+    adminRenderBanners(document.getElementById("admin-content"));
+  } catch (e) { tg.showAlert(e.message); }
+});
+
+function bootReset() {
+  const spinner = document.getElementById("boot-spinner");
+  const text = document.getElementById("boot-text");
+  const errBox = document.getElementById("boot-error");
+  if (spinner) spinner.style.display = "block";
+  if (text) text.style.display = "block";
+  if (errBox) errBox.classList.remove("show");
+}
+
+function bootShowError(msg) {
+  const spinner = document.getElementById("boot-spinner");
+  const text = document.getElementById("boot-text");
+  const errBox = document.getElementById("boot-error");
+  const errText = document.getElementById("boot-error-text");
+  if (spinner) spinner.style.display = "none";
+  if (text) text.style.display = "none";
+  if (errText) errText.textContent = msg;
+  if (errBox) errBox.classList.add("show");
+}
+
+function bootHide() {
+  const b = document.getElementById("boot-screen");
+  if (!b) return;
+  b.classList.add("hidden");
+  setTimeout(() => { try { b.remove(); } catch(e) {} }, 350);
+}
+
+const bootRetryBtn = document.getElementById("boot-retry-btn");
+if (bootRetryBtn) {
+  bootRetryBtn.onclick = () => { bootReset(); init(); };
+}
+
+async function init() {
+  initTheme();
+  renderFaq();
+
+  const initDataReady = await waitForInitData(8000);
+
+  if (!initDataReady) {
+    bootShowError("Приложение нужно открыть через бота в Telegram.");
+    return;
+  }
+
+  try {
+    await loadHome();
+    bootHide();
+  } catch (e) {
+    console.error("Init error:", e);
+    bootShowError(e.message || "Не удалось загрузить данные. Нажмите «Повторить попытку».");
+  }
+}
+
+init();
+</script>
+</body>
+</html>
