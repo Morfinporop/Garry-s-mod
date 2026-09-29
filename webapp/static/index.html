@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>FlowVPN</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="/style.css?v=8">
+<link rel="stylesheet" href="/style.css?v=9">
 </head>
 <body>
 
@@ -463,18 +463,38 @@ function avatarUrl(uid) {
   return `/api/avatar/${uid}?v=${bucket}`;
 }
 
-function applyThemeColor(color) {
-  currentAccentColor = color || "#ffffff";
-  document.documentElement.style.setProperty('--accent', currentAccentColor);
-  const isLight = isColorBright(currentAccentColor);
-  document.documentElement.style.setProperty('--accent-text', isLight ? '#000000' : '#ffffff');
-  try { localStorage.setItem('flowvpn_theme_color', currentAccentColor); } catch (e) {}
+/* ============ ТЕМА: полный перекрас всего интерфейса от выбранного цвета ============ */
 
-  document.querySelectorAll('.theme-swatch').forEach(s => {
-    s.classList.toggle('active', s.dataset.color.toLowerCase() === currentAccentColor.toLowerCase());
-  });
-  const customInp = document.getElementById('theme-custom-color');
-  if (customInp) customInp.value = currentAccentColor;
+function hexToHsl(hex) {
+  hex = (hex || "#ffffff").replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  let r = (parseInt(hex.substr(0, 2), 16) || 0) / 255;
+  let g = (parseInt(hex.substr(2, 2), 16) || 0) / 255;
+  let b = (parseInt(hex.substr(4, 2), 16) || 0) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) {
+    h = 0; s = 0;
+  } else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      default: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return { h: h * 360, s: s * 100, l: l * 100 };
+}
+
+function hexToRgba(hex, alpha) {
+  hex = (hex || "#ffffff").replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  const r = parseInt(hex.substr(0, 2), 16) || 0;
+  const g = parseInt(hex.substr(2, 2), 16) || 0;
+  const b = parseInt(hex.substr(4, 2), 16) || 0;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function isColorBright(hex) {
@@ -486,11 +506,53 @@ function isColorBright(hex) {
   return (r * 299 + g * 587 + b * 114) / 1000 > 150;
 }
 
+function applyThemeColor(color) {
+  currentAccentColor = color || "#ffffff";
+  const root = document.documentElement.style;
+  const { h, s, l } = hexToHsl(currentAccentColor);
+  const H = h.toFixed(1);
+
+  // сам акцент (кнопки, активные элементы)
+  root.setProperty('--accent', currentAccentColor);
+  const isLight = isColorBright(currentAccentColor);
+  root.setProperty('--accent-text', isLight ? '#000000' : '#ffffff');
+  root.setProperty('--accent-soft', hexToRgba(currentAccentColor, 0.16));
+
+  // основной текст — тон акцента, но всегда достаточно светлый для читаемости на тёмном фоне
+  const textSat = Math.min(s, 65);
+  const textLight = Math.max(l, 88);
+  root.setProperty('--text', `hsl(${H}, ${textSat.toFixed(1)}%, ${textLight.toFixed(1)}%)`);
+
+  // приглушённый текст — тот же тон, но темнее и менее насыщенно
+  const dimSat = Math.min(s, 35);
+  root.setProperty('--text-dim', `hsl(${H}, ${dimSat.toFixed(1)}%, 63%)`);
+
+  // поверхности (карточки/панели) — из чёрного в тёмный оттенок выбранного цвета
+  const surfSat = Math.min(s, 42);
+  root.setProperty('--surface', `hsla(${H}, ${surfSat.toFixed(1)}%, 9%, 0.92)`);
+  root.setProperty('--surface-2', `hsla(${H}, ${surfSat.toFixed(1)}%, 13%, 0.95)`);
+  root.setProperty('--surface-3', `hsla(${H}, ${surfSat.toFixed(1)}%, 17%, 0.97)`);
+
+  // границы — тонкая подсветка в тон акцента
+  const borderSat = Math.min(s, 40);
+  root.setProperty('--border', `hsla(${H}, ${borderSat.toFixed(1)}%, 60%, 0.16)`);
+
+  try { localStorage.setItem('flowvpn_theme_color', currentAccentColor); } catch (e) {}
+
+  document.querySelectorAll('.theme-swatch').forEach(sw => {
+    sw.classList.toggle('active', sw.dataset.color.toLowerCase() === currentAccentColor.toLowerCase());
+  });
+  const customInp = document.getElementById('theme-custom-color');
+  if (customInp) customInp.value = currentAccentColor;
+}
+
 function initTheme() {
   let saved = null;
   try { saved = localStorage.getItem('flowvpn_theme_color'); } catch (e) {}
   applyThemeColor(saved || "#ffffff");
 }
+
+/* ============ конец блока темы ============ */
 
 document.getElementById("theme-toggle").onclick = (e) => {
   e.preventDefault();
