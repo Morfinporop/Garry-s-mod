@@ -242,9 +242,12 @@
       <div class="modal-title">Пополнение баланса</div>
       <div class="modal-close" data-close="modal-topup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
     </div>
-    <input type="number" id="topup-amount" class="input" placeholder="Сумма в ₽">
-    <div class="input-hint" id="topup-hint">Минимальная сумма пополнения — 50 ₽</div>
-    <button class="btn btn-primary btn-block" id="topup-confirm">Оплатить</button>
+    <input type="number" id="topup-amount" class="input" placeholder="Сумма в 1₽">
+    <div class="input-hint" id="topup-hint">Минимальная сумма пополнения — 1 ₽</div>
+    <button class="btn btn-primary btn-block btn-pay" id="topup-confirm">
+  <span class="pay-btn-text">Оплатить</span>
+  <span class="pay-btn-badge">ЮKassa</span>
+    </button>
   </div>
 </div>
 
