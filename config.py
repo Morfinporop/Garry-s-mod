@@ -40,7 +40,7 @@ ADMIN_IDS: list[int] = [
     944385018,
 ]
 
-DB_PATH = os.getenv("DB_PATH", "")
+DB_PATH = os.getenv("DB_PATH", "data/flowvpn.db")
 
 XUI_HOST     = os.getenv("XUI_HOST", "")
 XUI_USERNAME = os.getenv("XUI_USERNAME", "")
