@@ -646,7 +646,7 @@ async def create_key(
             raise
 
         _cache_del(f"user_keys:{user_id}")
-        return vless_link
+        return sub_link
 
 
 async def set_auto_renew(key_id: int, enabled: bool) -> None:
