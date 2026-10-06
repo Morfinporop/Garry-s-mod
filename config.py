@@ -42,20 +42,10 @@ ADMIN_IDS: list[int] = [
 
 DB_PATH = os.getenv("DB_PATH", "")
 
-XUI_HOST       = os.getenv("XUI_HOST", "")
-XUI_USERNAME   = os.getenv("XUI_USERNAME", "")
-XUI_PASSWORD   = os.getenv("XUI_PASSWORD", "")
-XUI_INBOUND_ID = int(os.getenv("XUI_INBOUND_ID", ""))
-
-XUI_SERVER_ADDRESS = os.getenv("XUI_SERVER_ADDRESS", "")
-XUI_SERVER_PORT    = int(os.getenv("XUI_SERVER_PORT", ""))
-XUI_PUBLIC_KEY     = os.getenv("XUI_PUBLIC_KEY", "")
-XUI_SHORT_ID       = os.getenv("XUI_SHORT_ID", "")
-XUI_SNI            = os.getenv("XUI_SNI", "")
-XUI_FINGERPRINT    = os.getenv("XUI_FINGERPRINT", "")
-
-XUI_ENCRYPTION        = os.getenv("XUI_ENCRYPTION", "")
-XUI_GRPC_SERVICE_NAME = os.getenv("XUI_GRPC_SERVICE_NAME", "")
+XUI_HOST     = os.getenv("XUI_HOST", "")
+XUI_USERNAME = os.getenv("XUI_USERNAME", "")
+XUI_PASSWORD = os.getenv("XUI_PASSWORD", "")
+XUI_SUB_URL  = os.getenv("XUI_SUB_URL", "https://sub.flowvpn.su:2053/3o3ntto7rlvdmgtv")
 
 SUSPICIOUS_NEW_IP_THRESHOLD = 5
 

@@ -40,9 +40,6 @@ def setup_logging(log_dir: str = "logs") -> None:
     logging.getLogger("asyncio").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("py3xui").setLevel(logging.WARNING)
-    logging.getLogger("py3xui.async_api").setLevel(logging.ERROR)
-    logging.getLogger("py3xui.async_api.async_api_base").setLevel(logging.ERROR)
 
 
 class TelegramErrorNotifier:

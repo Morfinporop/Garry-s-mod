@@ -615,7 +615,7 @@ async def create_key(
         if not admin_check and keys_count >= MAX_KEYS_PER_USER:
             raise ValueError(f"Лимит ключей ({MAX_KEYS_PER_USER}). Дождитесь истечения старых.")
 
-        vless_link, client_uuid = await create_vpn_user(user_id, total_hours, tariff)
+        sub_link, client_email = await create_vpn_user(user_id, total_hours, tariff)
 
         now = datetime.now()
         expires = now + timedelta(hours=total_hours)
@@ -627,7 +627,7 @@ async def create_key(
                 "(user_id, key_value, tariff, proxy_address, created_at, expires_at, is_duo, max_users, is_active, auto_renew, key_source, price_paid) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)",
                 (
-                    user_id, vless_link, tariff, client_uuid,
+                    user_id, sub_link, tariff, client_email,
                     now.strftime("%Y-%m-%d %H:%M"),
                     expires.strftime("%Y-%m-%d %H:%M"),
                     1 if max_users >= 2 else 0,
@@ -640,9 +640,9 @@ async def create_key(
         except Exception:
             logger.exception("create_key: db error, rolling back vpn client")
             try:
-                await delete_vpn_user(client_uuid)
+                await delete_vpn_user(client_email)
             except Exception:
-                logger.exception(f"create_key: failed to rollback {client_uuid}")
+                logger.exception(f"create_key: failed to rollback {client_email}")
             raise
 
         _cache_del(f"user_keys:{user_id}")
