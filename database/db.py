@@ -57,7 +57,7 @@ async def get_db() -> aiosqlite.Connection:
             return _db_connection
 
         db_dir = os.path.dirname(DB_PATH)
-        if db_dir and not os.path.exists(db_dir):
+        if db_dir:
             os.makedirs(db_dir, exist_ok=True)
 
         conn = await aiosqlite.connect(DB_PATH)

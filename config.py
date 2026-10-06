@@ -40,7 +40,7 @@ ADMIN_IDS: list[int] = [
     944385018,
 ]
 
-DB_PATH = os.getenv("DB_PATH", "data/flowvpn.db")
+DB_PATH = os.getenv("DB_PATH", "").strip() or "data/flowvpn.db"
 
 XUI_HOST     = os.getenv("XUI_HOST", "")
 XUI_USERNAME = os.getenv("XUI_USERNAME", "")
@@ -49,7 +49,7 @@ XUI_SUB_URL  = os.getenv("XUI_SUB_URL", "https://sub.flowvpn.su:2053/3o3ntto7rlv
 
 SUSPICIOUS_NEW_IP_THRESHOLD = 5
 
-WEBAPP_PORT = int(os.getenv("PORT", os.getenv("WEBAPP_PORT", "")))
+WEBAPP_PORT = int(os.getenv("PORT") or os.getenv("WEBAPP_PORT") or "3000")
 _raw_miniapp = os.getenv("MINIAPP_URL", "")
 MINIAPP_URL = _raw_miniapp if _raw_miniapp.startswith("https://") else f"https://{_raw_miniapp}" if _raw_miniapp else ""
 
