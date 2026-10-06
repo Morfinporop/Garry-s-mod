@@ -873,7 +873,7 @@ async def admin_user_card(uid: int, _: int = Depends(get_admin_user_id)):
     summary = await get_user_purchase_summary(uid)
     txs = await get_user_transactions(uid, limit=5, offset=0)
 
-    auto_renew = any(bool(k.get("auto_renew")) for k in keys)
+    auto_renew = any(bool(k["auto_renew"]) for k in keys)
 
     return {
         "user": {
@@ -975,7 +975,7 @@ async def admin_toggle_autorenew(uid: int, _: int = Depends(get_admin_user_id)):
     if not keys:
         raise HTTPException(400, "У пользователя нет ключей")
 
-    current = any(bool(k.get("auto_renew")) for k in keys)
+    current = any(bool(k["auto_renew"]) for k in keys)
 
     count = await set_user_auto_renew_all(uid, not current)
     new_state = not current

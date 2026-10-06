@@ -202,7 +202,7 @@ async def _show_card(message, user_id: int, state: FSMContext | None = None):
     keys = await get_user_active_keys_with_id(user_id)
     user = await get_user(user_id)
 
-    auto_on = any(bool(k.get("auto_renew")) for k in keys)
+    auto_on = any(bool(k["auto_renew"]) for k in keys)
     is_banned = bool(user["is_banned"]) if user else False
     await show_screen(
         message,
@@ -595,7 +595,7 @@ async def user_auto_renew_toggle(callback: CallbackQuery, state: FSMContext):
         await callback.answer("У пользователя нет ключей", show_alert=True)
         return
 
-    current = any(bool(k.get("auto_renew")) for k in keys)
+    current = any(bool(k["auto_renew"]) for k in keys)
     count = await set_user_auto_renew_all(uid, not current)
     status_text = "включено" if not current else "выключено"
     await notify_user(callback.bot, uid, f"Автопродление <b>{status_text}</b> администратором.\n\nКлючей: {count}")
