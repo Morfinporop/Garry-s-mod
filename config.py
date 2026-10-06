@@ -50,7 +50,8 @@ XUI_SUB_URL  = os.getenv("XUI_SUB_URL", "https://sub.flowvpn.su:2053/3o3ntto7rlv
 SUSPICIOUS_NEW_IP_THRESHOLD = 5
 
 WEBAPP_PORT = int(os.getenv("PORT", os.getenv("WEBAPP_PORT", "")))
-MINIAPP_URL = os.getenv("MINIAPP_URL", "")
+_raw_miniapp = os.getenv("MINIAPP_URL", "")
+MINIAPP_URL = _raw_miniapp if _raw_miniapp.startswith("https://") else f"https://{_raw_miniapp}" if _raw_miniapp else ""
 
 BOT_STATUS_ON_MESSAGE  = "Бот снова активен и готов к работе! Приятного использования FlowVPN."
 BOT_STATUS_OFF_MESSAGE = "Бот временно отключён на технические работы. Мы скоро вернёмся, приносим извинения за неудобства."
