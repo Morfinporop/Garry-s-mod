@@ -41,7 +41,7 @@ from config import (
     BOT_STATUS_ON_MESSAGE, BOT_STATUS_OFF_MESSAGE,
 )
 
-from xui_api import check_suspicious_activity
+from xui_api import check_suspicious_activity, warmup_and_log_panel
 from webapp import extra_store
 from webapp.api import app as webapp_app, set_bot_token, set_bot, set_bot_username
 
@@ -584,6 +584,13 @@ async def main() -> None:
     except Exception:
         logger.exception("DB init failed")
         raise
+
+    # Проверка панели 3x-ui: логирует локации и шаблон ссылки подписки.
+    # Ошибки не фатальны — бот продолжает работать.
+    try:
+        await warmup_and_log_panel()
+    except Exception:
+        logger.exception("XUI panel warmup failed")
 
     dp.include_router(errors.router)
     dp.include_router(start.router)
