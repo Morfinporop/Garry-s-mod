@@ -293,26 +293,31 @@ body {
 }
 .btn-danger { background: var(--danger); color: #ffffff; box-shadow: var(--shadow-sm); }
 
-/* ===== Кнопка оплаты с бейджем ЮKassa ===== */
+/* ===== Кнопка "Оплатить" с бейджем ЮKassa ===== */
 .btn-pay {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  overflow: hidden;
 }
-.pay-btn-text {
+.btn-pay .pay-btn-text {
   font-weight: 800;
 }
-.pay-btn-badge {
-  background: #7000ff;
+.btn-pay .pay-btn-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #6c2bd9;
   color: #ffffff;
   font-size: 11px;
   font-weight: 800;
-  padding: 4px 8px;
-  border-radius: 0;
   line-height: 1;
-  letter-spacing: 0.2px;
+  padding: 4px 7px;
+  border-radius: 0;
+  white-space: nowrap;
+  letter-spacing: 0.1px;
 }
 
 .reviews-actions .btn[disabled],
