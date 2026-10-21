@@ -5,9 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>FlowVPN</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="/style.css?v=13">
+<link rel="stylesheet" href="/style.css?v=12">
 </head>
 <body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="cloud" x="-20%" y="-40%" width="140%" height="180%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="4" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="10" result="d"/>
+    <feGaussianBlur in="d" stdDeviation="0.6"/>
+  </filter>
+</svg>
 
 <div id="app">
 
@@ -333,7 +341,7 @@
 </div>
 
 <div id="modal-reviews-list" class="modal hidden">
-  <div class="modal-content reviews-photo-bg">
+  <div class="modal-content">
     <div class="modal-header">
       <div class="modal-title">Все отзывы</div>
       <div class="modal-close" data-close="modal-reviews-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
