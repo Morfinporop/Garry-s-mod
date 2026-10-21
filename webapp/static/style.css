@@ -42,6 +42,10 @@
   --shadow-sm: 0 8px 22px rgba(0,0,0,.4);
   --radius: 26px;
   --radius-sm: 20px;
+
+  /* единая "облачная" анимация нажатия — как у облачков выбора подписки */
+  --ease-cloud: cubic-bezier(.34, 1.42, .64, 1);
+  --press-anim: transform .18s var(--ease-cloud), box-shadow .2s ease, opacity .2s ease, filter .2s ease, border-color .2s ease;
 }
 
 html, body {
@@ -72,7 +76,7 @@ body {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
-.referral-stat, .key-value, .modal-key-preview, .promo-result, .banner-upload-zone, .input,
+.referral-stat, .key-value, .modal-key-preview, .banner-upload-zone, .input,
 .tx-icon-wrap, .accordion-head-icon, .promo-info-icon, .contact-icon-wrap, .admin-user-avatar,
 .profile-avatar, .review-avatar, .referral-title-icon, .shop-trial-icon, .icon-wrap, .key-tag,
 .key-delete-btn, .admin-icon-btn, .admin-action-row .state {
@@ -191,8 +195,8 @@ body {
 .view.active {
   display: block;
   opacity: 0;
-  animation: viewIn .22s ease-out forwards;
-  will-change: opacity;
+  animation: viewIn .28s var(--ease-cloud) forwards;
+  will-change: opacity, transform;
 }
 @keyframes viewIn { to { opacity: 1; } }
 
@@ -381,9 +385,6 @@ body {
 .profile-id { font-size: 12px; color: var(--text-dim); font-family: monospace; }
 
 /* ===== ПРОМО ===== */
-.promo-result { margin-top: 14px; padding: 14px; border-radius: var(--radius-sm); font-size: 13.5px; display: none; }
-.promo-result.show { display: block; animation: viewIn .2s ease forwards; }
-.promo-result.error { border-color: var(--danger); color: var(--danger); }
 .promo-info-card { border-radius: var(--radius-sm); padding: 16px; margin-bottom: 10px; display: flex; gap: 12px; align-items: flex-start; }
 .promo-info-icon { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex: none; }
 .promo-info-icon svg { width: 17px; height: 17px; color: var(--text-dim); }
@@ -457,6 +458,26 @@ body {
 textarea.input { resize: vertical; min-height: 90px; }
 .input-hint { font-size: 11.5px; color: var(--text-dim); margin: -4px 0 14px 2px; }
 
+/* статусы поля (например, промокод): красная обводка при ошибке, зелёная при успехе */
+.input.is-error, .input.is-error:focus {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 3px rgba(255,90,95,.18), inset 0 1px 0 rgba(255,255,255,.1) !important;
+  animation: fieldShake .34s ease;
+}
+.input.is-success, .input.is-success:focus {
+  border-color: var(--success) !important;
+  box-shadow: 0 0 0 3px rgba(52,211,153,.18), inset 0 1px 0 rgba(255,255,255,.1) !important;
+  animation: cloudPop .34s var(--ease-cloud);
+}
+.input.is-error::placeholder { color: rgba(255,90,95,.75); }
+@keyframes fieldShake {
+  0%, 100% { transform: translateX(0); }
+  22% { transform: translateX(-5px); }
+  45% { transform: translateX(5px); }
+  68% { transform: translateX(-3px); }
+  86% { transform: translateX(2px); }
+}
+
 /* ===== МОДАЛКИ ===== */
 .modal { position: fixed; inset: 0; background: var(--overlay); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: flex; align-items: flex-end; justify-content: center; z-index: 100; animation: overlayIn .2s ease; }
 @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
@@ -494,14 +515,15 @@ textarea.input { resize: vertical; min-height: 90px; }
 .subscription-title { font-size: 12px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; margin-bottom: 10px; color: var(--text); }
 .subscription-desc { font-size: 12px; color: var(--text-dim); line-height: 1.55; margin-bottom: 16px; }
 .subscription-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.subscription-chips { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; min-width: 0; }
+.subscription-chips { display: flex; flex-wrap: wrap; gap: 9px; flex: 1; min-width: 0; }
+#subscription-plan-chips { margin-bottom: 14px; }
 .subscription-chip {
   position: relative; isolation: isolate;
   background: transparent; border: none; cursor: pointer;
   padding: 10px 14px; font-size: 12px; font-weight: 800;
   color: var(--accent-text); font-family: inherit;
   border-radius: 999px;
-  transition: transform .12s;
+  transition: var(--press-anim);
 }
 .subscription-chip::before {
   content: ""; position: absolute; inset: -2px; z-index: -1;
@@ -509,13 +531,63 @@ textarea.input { resize: vertical; min-height: 90px; }
   filter: url(#cloud);
   box-shadow: 0 0 14px rgba(255,255,255,.2);
   opacity: .5;
-  transition: opacity .15s, box-shadow .15s;
+  transition: opacity .2s ease, box-shadow .2s ease;
 }
 .subscription-chip.selected::before { opacity: 1; box-shadow: 0 0 18px rgba(255,255,255,.5); }
+.subscription-chip.selected { animation: cloudPop .34s var(--ease-cloud); }
 .subscription-chip:active { transform: scale(.93); }
 .subscription-buy { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: none; }
-.subscription-price { font-size: 13px; font-weight: 800; white-space: nowrap; }
-.subscription-buy-btn { padding: 10px 20px; font-size: 13px; white-space: nowrap; }
+.subscription-price { font-size: 13px; font-weight: 800; white-space: nowrap; display: inline-block; }
+.subscription-price.bump { animation: priceBump .34s var(--ease-cloud); }
+.subscription-buy-btn { padding: 11px 22px; font-size: 13px; white-space: nowrap; pointer-events: auto; }
+.subscription-buy-btn::before { border-radius: 999px; }
+
+@keyframes cloudPop { 0% { transform: scale(.9); } 55% { transform: scale(1.06); } 100% { transform: scale(1); } }
+@keyframes priceBump { 0% { transform: scale(.86); opacity: .45; } 60% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); } }
+
+/* ===== ЕДИНЫЕ АНИМАЦИИ: всё нажимается так же мягко, как облачки подписки ===== */
+.btn, .subscription-chip, .nav-item, .icon-btn, .balance-chip, .theme-swatch,
+.contact-card, .admin-menu-btn, .admin-user-row, .admin-action-row, .admin-icon-btn,
+.admin-action-row .state, .key-card, .tx-card, .shop-trial-card, .banner-card,
+.referral-link-row, .key-value, .key-delete-btn, .modal-key-preview, .pager-btn,
+.link-btn, .review-heart-btn, .review-delete-btn, .banner-upload-zone, .accordion-head,
+.modal-close, .star-select svg, .checkbox-row input, .promo-info-card {
+  transition: var(--press-anim);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* мелкие элементы — заметное "облачное" сжатие */
+.btn:active, .nav-item:active, .icon-btn:active, .balance-chip:active, .theme-swatch:active,
+.admin-icon-btn:active, .admin-action-row .state:active, .key-delete-btn:active,
+.pager-btn:not([disabled]):active, .link-btn:active, .review-heart-btn:active,
+.review-delete-btn:active, .modal-close:active, .star-select svg:active {
+  transform: scale(.93);
+  opacity: 1;
+}
+
+/* крупные карточки — то же движение, только мягче */
+.contact-card:active, .admin-menu-btn:active, .admin-user-row:active, .admin-action-row:active,
+.key-card:active, .tx-card:active, .shop-trial-card:active, .banner-card:active,
+.referral-link-row:active, .key-value:active, .modal-key-preview:active,
+.banner-upload-zone:active, .accordion-head:active, .promo-info-card:active {
+  transform: scale(.975);
+}
+
+.btn[disabled]:active, .shop-trial-card.claimed:active { transform: none; }
+.star-select svg.active { animation: cloudPop .3s var(--ease-cloud); }
+.empty-state .btn, .reviews-actions .btn { will-change: transform; }
+
+/* плавная смена вкладок и появление модалок в том же характере */
+@keyframes viewIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.view.active { animation: viewIn .28s var(--ease-cloud) forwards; }
+@keyframes sheetUp { from { transform: translateY(42px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+.modal-content { animation: sheetUp .3s var(--ease-cloud); }
+@keyframes dropIn { from { opacity: 0; transform: translateY(-10px) scale(.97); } to { opacity: 1; transform: none; } }
+.notif-panel { animation: dropIn .24s var(--ease-cloud); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
 
 @media (hover: hover) and (pointer: fine) {
   .btn:hover { filter: brightness(1.08); }

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>FlowVPN</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="/style.css?v=17">
+<link rel="stylesheet" href="/style.css?v=18">
 </head>
 <body>
 
@@ -123,7 +123,6 @@
         <div class="glass-card">
           <input type="text" id="promo-input" class="input" placeholder="Введите промокод" autocapitalize="characters" style="margin-bottom:14px;">
           <button class="btn btn-primary btn-block" id="promo-submit">Активировать</button>
-          <div id="promo-result" class="promo-result"></div>
         </div>
       </div>
 
@@ -819,7 +818,7 @@ function switchTab(tab) {
   if (tab === "home") loadHome();
   if (tab === "shop") { shopHistoryPage = 0; loadShop(); }
   if (tab === "profile") loadProfile();
-  if (tab === "promo") loadPromoStatus();
+  if (tab === "promo") { loadBanner("promo", "promo-banner-section"); loadPromoStatus(); }
   if (tab === "admin") {
     adminState.view = "menu";
     adminUsersSearch = ""; adminUsersPage = 0; adminUserHistoryPage = 0;
@@ -1217,92 +1216,155 @@ function multiIconFor(key) {
   return peopleIcon(2);
 }
 
-/* ============ Карточка "ПОДПИСКА" в магазине: duo/trio/mix/1 месяц ============ */
+/* ============ Карточка "ПОДПИСКА" в магазине: solo/duo/trio/mix × 1 месяц / 1 год ============ */
 // Тарифы берутся динамически из /api/tariffs (см. loadShop), а не хардкодятся,
 // чтобы цены/скидки всегда совпадали с backend (config.py + промо-скидка).
 // Бэкенд (webapp/api.py → /api/tariffs) уже применяет discount_percent к price,
 // поэтому на клиенте скидку повторно не считаем — просто показываем plan.price как есть.
+// Матрица: тариф (solo/duo/trio/mix) × срок (1 месяц / 1 год) → конкретный ключ бэкенда.
 
-let shopAllPlans = [];
-let selectedShopPlan = null;
+const SUBSCRIPTION_PLANS = [
+  { plan: "solo", label: "solo", month: { type: "tariff", key: "1_month"   }, year: { type: "tariff", key: "12_months" } },
+  { plan: "duo",  label: "duo",  month: { type: "multi",  key: "duo"       }, year: { type: "multi",  key: "duo_year"  } },
+  { plan: "trio", label: "trio", month: { type: "multi",  key: "trio"      }, year: { type: "multi",  key: "trio_year" } },
+  { plan: "mix",  label: "mix",  month: { type: "multi",  key: "mix"       }, year: { type: "multi",  key: "mix_year"  } },
+];
+const SUBSCRIPTION_PERIODS = [
+  { period: "month", label: "1 месяц" },
+  { period: "year",  label: "1 год" },
+];
+
+let shopPlanMatrix = {};
+let selectedPlanKey = "solo";
+let selectedPeriodKey = "month";
 
 function buildShopPlansFromTariffs(data) {
-  const multiPlans = (data.multi || []).map(t => ({
-    type: "multi",
-    key: t.key,
-    label: (t.title || t.key).toLowerCase(),
-    name: `${t.title} подписка`,
-    price: t.price,
-    days: t.days,
-    max_users: t.max_users,
-  }));
-  const single = (data.tariffs || []).find(t => t.key === "1_month");
-  const singlePlans = single ? [{
-    type: "tariff",
-    key: single.key,
-    label: "1 месяц",
-    name: single.name,
-    price: single.price,
-    days: single.days,
-  }] : [];
-  return [...multiPlans, ...singlePlans];
+  const byTariff = {};
+  (data.tariffs || []).forEach(t => { byTariff[t.key] = t; });
+  const byMulti = {};
+  (data.multi || []).forEach(t => { byMulti[t.key] = t; });
+
+  const matrix = {};
+  SUBSCRIPTION_PLANS.forEach(p => {
+    SUBSCRIPTION_PERIODS.forEach(per => {
+      const ref = p[per.period];
+      if (!ref) return;
+      const t = ref.type === "tariff" ? byTariff[ref.key] : byMulti[ref.key];
+      if (!t) return;
+      matrix[`${p.plan}:${per.period}`] = {
+        type: ref.type,
+        key: ref.key,
+        plan: p.plan,
+        period: per.period,
+        name: t.name || `${t.title} подписка`,
+        price: t.price,
+        days: t.days,
+        max_users: t.max_users || "",
+      };
+    });
+  });
+  return matrix;
 }
 
+function hasShopPlans() { return Object.keys(shopPlanMatrix).length > 0; }
+function currentShopPlan() { return shopPlanMatrix[`${selectedPlanKey}:${selectedPeriodKey}`] || null; }
+
 function subscriptionCardHtml() {
-  if (!shopAllPlans.length) return "";
-  const chips = shopAllPlans.map(p => `<button type="button" class="subscription-chip" data-key="${p.key}">${esc(p.label)}</button>`).join("");
+  if (!hasShopPlans()) return "";
+  const planChips = SUBSCRIPTION_PLANS
+    .filter(p => SUBSCRIPTION_PERIODS.some(per => shopPlanMatrix[`${p.plan}:${per.period}`]))
+    .map(p => `<button type="button" class="subscription-chip" data-plan="${p.plan}">${esc(p.label)}</button>`)
+    .join("");
+  const periodChips = SUBSCRIPTION_PERIODS
+    .filter(per => SUBSCRIPTION_PLANS.some(p => shopPlanMatrix[`${p.plan}:${per.period}`]))
+    .map(per => `<button type="button" class="subscription-chip" data-period="${per.period}">${esc(per.label)}</button>`)
+    .join("");
   return `
     <div class="glass-card subscription-card">
       <div class="subscription-title">Подписка</div>
       <div class="subscription-desc">
         Доступ к нашему сервису идёт через платную подписку.<br>
         Выберите вариант подписки если хотите иметь подписку со своими друзьями.<br>
-        Не выбирайте вариант ниже если покупаете подписку для себя.
+        Выбирайте solo если покупаете подписку для себя.
       </div>
+      <div class="subscription-chips" id="subscription-plan-chips">${planChips}</div>
       <div class="subscription-row">
-        <div class="subscription-chips" id="subscription-chips">${chips}</div>
+        <div class="subscription-chips" id="subscription-period-chips">${periodChips}</div>
         <div class="subscription-buy">
           <div class="subscription-price" id="subscription-price">0 ₽</div>
-          <button class="btn shop-trial-btn subscription-buy-btn" id="subscription-buy-btn">Купить</button>
+          <button type="button" class="btn btn-primary subscription-buy-btn" id="subscription-buy-btn">Купить</button>
         </div>
       </div>
     </div>
   `;
 }
 
-function selectShopPlan(plan) {
-  selectedShopPlan = plan;
-  document.querySelectorAll('.subscription-chip').forEach(ch => {
-    ch.classList.toggle('selected', ch.dataset.key === plan.key);
+function updateSubscriptionSelection(animate = false) {
+  document.querySelectorAll('#subscription-plan-chips .subscription-chip').forEach(ch => {
+    ch.classList.toggle('selected', ch.dataset.plan === selectedPlanKey);
   });
+  document.querySelectorAll('#subscription-period-chips .subscription-chip').forEach(ch => {
+    ch.classList.toggle('selected', ch.dataset.period === selectedPeriodKey);
+  });
+
+  const plan = currentShopPlan();
   const priceEl = document.getElementById('subscription-price');
-  if (priceEl) priceEl.textContent = `${plan.price} ₽`;
+  if (priceEl) {
+    priceEl.textContent = plan ? `${plan.price} ₽` : "—";
+    if (animate) {
+      priceEl.classList.remove('bump');
+      void priceEl.offsetWidth;
+      priceEl.classList.add('bump');
+    }
+  }
+  const buyBtn = document.getElementById('subscription-buy-btn');
+  if (buyBtn) buyBtn.disabled = !plan;
 }
 
 function wireSubscriptionCard(container) {
-  if (!shopAllPlans.length) return;
-  container.querySelectorAll('.subscription-chip').forEach(ch => {
+  if (!hasShopPlans()) return;
+
+  if (!currentShopPlan()) {
+    const first = Object.values(shopPlanMatrix)[0];
+    if (first) { selectedPlanKey = first.plan; selectedPeriodKey = first.period; }
+  }
+
+  container.querySelectorAll('#subscription-plan-chips .subscription-chip').forEach(ch => {
     ch.onclick = () => {
-      const plan = shopAllPlans.find(p => p.key === ch.dataset.key);
-      if (plan) { selectShopPlan(plan); haptic('selection'); }
+      if (!shopPlanMatrix[`${ch.dataset.plan}:${selectedPeriodKey}`]) return;
+      selectedPlanKey = ch.dataset.plan;
+      updateSubscriptionSelection(true);
+      haptic('selection');
     };
   });
+
+  container.querySelectorAll('#subscription-period-chips .subscription-chip').forEach(ch => {
+    ch.onclick = () => {
+      if (!shopPlanMatrix[`${selectedPlanKey}:${ch.dataset.period}`]) return;
+      selectedPeriodKey = ch.dataset.period;
+      updateSubscriptionSelection(true);
+      haptic('selection');
+    };
+  });
+
   const buyBtn = container.querySelector('#subscription-buy-btn');
   if (buyBtn) {
     buyBtn.onclick = () => {
-      if (!selectedShopPlan) return;
+      const plan = currentShopPlan();
+      if (!plan) return;
+      haptic('impact', 'light');
       openBuyConfirm({
-        buy: selectedShopPlan.type,
-        key: selectedShopPlan.key,
-        name: selectedShopPlan.name,
-        price: selectedShopPlan.price,
-        days: selectedShopPlan.days,
-        maxusers: selectedShopPlan.max_users || "",
+        buy: plan.type,
+        key: plan.key,
+        name: plan.name,
+        price: plan.price,
+        days: plan.days,
+        maxusers: plan.max_users || "",
       });
     };
   }
-  const singlePlan = shopAllPlans.find(p => p.type === "tariff") || shopAllPlans[0];
-  if (singlePlan) selectShopPlan(singlePlan);
+
+  updateSubscriptionSelection(false);
 }
 /* ============ конец блока подписки ============ */
 
@@ -1317,7 +1379,7 @@ async function loadShop() {
       renderEmptyState(container, "Магазин временно отключён", null, `<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 9h8"/>`);
       return;
     }
-    shopAllPlans = buildShopPlansFromTariffs(data);
+    shopPlanMatrix = buildShopPlansFromTariffs(data);
     const trialClaimed = !data.show_trial;
     let html = "";
     if (data.discount_percent > 0) {
@@ -1577,23 +1639,37 @@ function pollPayment(paymentId) {
   }, 3000);
 }
 
+function setPromoFieldState(state) {
+  const input = document.getElementById("promo-input");
+  if (!input) return;
+  input.classList.remove("is-error", "is-success");
+  if (state) {
+    input.classList.add(state === "error" ? "is-error" : "is-success");
+    void input.offsetWidth;
+  }
+}
+
+const promoInputEl = document.getElementById("promo-input");
+if (promoInputEl) promoInputEl.addEventListener("input", () => setPromoFieldState(null));
+
 document.getElementById("promo-submit").onclick = () => withBusy(document.getElementById("promo-submit"), async () => {
   const code = document.getElementById("promo-input").value.trim();
-  const resultBox = document.getElementById("promo-result");
-  if (!code) { tg.showAlert("Введите промокод"); return; }
+  if (!code) { setPromoFieldState("error"); haptic('notification', 'error'); return; }
   try {
     const result = await api("/api/promo/use", { method: "POST", body: JSON.stringify({ code }) });
     let text = "Промокод активирован!";
     if (result.discount > 0) text += ` На баланс начислено ${result.discount} ₽.`;
     if (result.bonus_days > 0) text += ` Ключ продлён/выдан на ${result.bonus_days} дней.`;
     if (result.discount_percent > 0) text += ` Скидка ${result.discount_percent}% на следующую покупку.`;
-    resultBox.textContent = text; resultBox.className = "promo-result show";
     document.getElementById("promo-input").value = "";
+    setPromoFieldState("success");
     haptic('notification', 'success');
+    tg.showAlert(text);
     loadHome().catch(() => {});
     loadPromoStatus();
   } catch (e) {
-    resultBox.textContent = e.message; resultBox.className = "promo-result show error";
+    setPromoFieldState("error");
+    haptic('notification', 'error');
   }
 });
 

@@ -18,15 +18,18 @@ INACTIVE_KEY_TTL_DAYS = 2
 
 TARIFFS = {
     "1_month":   {"name": "Старт (1мес)",  "price": 50,  "days": 30},
-    "12_months": {"name": "Профи (1год)",  "price": 990, "days": 365},
+    "12_months": {"name": "Профи (1год)",  "price": 600, "days": 365},
 }
 
 MULTI_TARIFFS = {
-    "duo":  {"name": "DUO подписка",  "title": "DUO",  "price": 75,  "days": 30, "max_users": 2},
-    "trio": {"name": "TRIO подписка", "title": "TRIO", "price": 125, "days": 30, "max_users": 3},
-    "mix":  {"name": "MIX подписка",  "title": "MIX",  "price": 175, "days": 30, "max_users": 4},
+    "duo":       {"name": "DUO подписка",         "title": "DUO",  "price": 75,   "days": 30,  "max_users": 2},
+    "trio":      {"name": "TRIO подписка",        "title": "TRIO", "price": 125,  "days": 30,  "max_users": 3},
+    "mix":       {"name": "MIX подписка",         "title": "MIX",  "price": 175,  "days": 30,  "max_users": 4},
+    "duo_year":  {"name": "DUO подписка (1год)",  "title": "DUO",  "price": 800,  "days": 365, "max_users": 2},
+    "trio_year": {"name": "TRIO подписка (1год)", "title": "TRIO", "price": 1300, "days": 365, "max_users": 3},
+    "mix_year":  {"name": "MIX подписка (1год)",  "title": "MIX",  "price": 1800, "days": 365, "max_users": 4},
 }
-MULTI_ORDER = ("duo", "trio", "mix")
+MULTI_ORDER = ("duo", "trio", "mix", "duo_year", "trio_year", "mix_year")
 
 TRIAL_DAYS        = 5
 TRIAL_TARIFF      = "Пробный период"

@@ -420,7 +420,7 @@ async def api_tariffs(user_id: int = Depends(get_current_user_id)):
         price = t["price"]
         if discount_pct:
             price = int(price * (100 - discount_pct) / 100)
-        multi.append({"key": key, "title": t["title"], "price": price, "original_price": t["price"] if discount_pct else None, "days": t["days"], "max_users": t["max_users"], "savings": t.get("savings")})
+        multi.append({"key": key, "title": t["title"], "name": t["name"], "price": price, "original_price": t["price"] if discount_pct else None, "days": t["days"], "max_users": t["max_users"], "savings": t.get("savings")})
 
     return {
         "tariffs": tariffs, "multi": multi, "show_trial": not trial_used,
