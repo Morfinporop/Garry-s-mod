@@ -520,43 +520,17 @@ function isColorBright(hex) {
 function applyThemeColor(color) {
   currentAccentColor = color || "#ffffff";
   const root = document.documentElement.style;
-  const { h, s, l } = hexToHsl(currentAccentColor);
-  const H = h.toFixed(1);
-
-  // сам акцент (кнопки, активные элементы)
   root.setProperty('--accent', currentAccentColor);
-  const isLight = isColorBright(currentAccentColor);
-  root.setProperty('--accent-text', isLight ? '#000000' : '#ffffff');
+  root.setProperty('--accent-text', isColorBright(currentAccentColor) ? '#000000' : '#ffffff');
   root.setProperty('--accent-soft', hexToRgba(currentAccentColor, 0.16));
-
-  // основной текст — тон акцента, но всегда достаточно светлый для читаемости на тёмном фоне
-  const textSat = Math.min(s, 65);
-  const textLight = Math.max(l, 88);
-  root.setProperty('--text', `hsl(${H}, ${textSat.toFixed(1)}%, ${textLight.toFixed(1)}%)`);
-
-  // приглушённый текст — тот же тон, но темнее и менее насыщенно
-  const dimSat = Math.min(s, 35);
-  root.setProperty('--text-dim', `hsl(${H}, ${dimSat.toFixed(1)}%, 63%)`);
-
-  // поверхности (карточки/панели) — из чёрного в тёмный оттенок выбранного цвета
-  const surfSat = Math.min(s, 42);
-  root.setProperty('--surface', `hsla(${H}, ${surfSat.toFixed(1)}%, 9%, 0.92)`);
-  root.setProperty('--surface-2', `hsla(${H}, ${surfSat.toFixed(1)}%, 13%, 0.95)`);
-  root.setProperty('--surface-3', `hsla(${H}, ${surfSat.toFixed(1)}%, 17%, 0.97)`);
-
-  // границы — тонкая подсветка в тон акцента
-  const borderSat = Math.min(s, 40);
-  root.setProperty('--border', `hsla(${H}, ${borderSat.toFixed(1)}%, 60%, 0.16)`);
-
   try { localStorage.setItem('flowvpn_theme_color', currentAccentColor); } catch (e) {}
-
   document.querySelectorAll('.theme-swatch').forEach(sw => {
     sw.classList.toggle('active', sw.dataset.color.toLowerCase() === currentAccentColor.toLowerCase());
   });
   const customInp = document.getElementById('theme-custom-color');
   if (customInp) customInp.value = currentAccentColor;
 }
-
+  
 function initTheme() {
   let saved = null;
   try { saved = localStorage.getItem('flowvpn_theme_color'); } catch (e) {}
@@ -1240,22 +1214,18 @@ function multiIconFor(key) {
 async function loadShop() {
   loadBanner("shop", "shop-banner-section");
   const container = document.getElementById("shop-content");
-  container.innerHTML = skeletonGrid(4, 140);
-
+  container.innerHTML = skeletonBlock(90);
   try {
     const data = await api("/api/tariffs");
     if (!data.shop_enabled) {
       renderEmptyState(container, "Магазин временно отключён", null, `<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 9h8"/>`);
       return;
     }
-
     const trialClaimed = !data.show_trial;
     let html = "";
-
     if (data.discount_percent > 0) {
       html += `<div class="discount-banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12l-8 8-9-9V4h7l10 8z"/></svg>Скидка ${data.discount_percent}% применится к следующей покупке</div>`;
     }
-
     html += `
       <div class="shop-trial-card ${trialClaimed ? "claimed" : ""}" id="shop-trial-btn">
         <div class="shop-trial-left">
@@ -1269,38 +1239,7 @@ async function loadShop() {
         </div>
         <button class="btn shop-trial-btn" id="shop-trial-action-btn" ${trialClaimed ? "disabled" : ""}>${trialClaimed ? "Забрано" : "Забрать"}</button>
       </div>`;
-
-    html += '<div class="section-header" style="margin-top:4px;"><span class="section-title">Тарифы</span></div><div class="tariff-grid">';
-    data.tariffs.forEach(t => {
-      html += `
-        <div class="tariff-tile" data-buy="tariff" data-key="${t.key}" data-name="${t.name}" data-price="${t.price}" data-days="${t.days}">
-          <div class="tariff-tile-icon">${tariffIconFor(t.name)}</div>
-          <div class="tariff-tile-name">${t.name}</div>
-          <div class="tariff-tile-days">${t.days} дней</div>
-          ${t.original_price ? `<span class="tariff-tile-price-old">${t.original_price} ₽</span>` : ""}
-          <div class="tariff-tile-price">${t.price} ₽</div>
-        </div>
-      `;
-    });
-    html += '</div>';
-
-    html += '<div class="section-header" style="margin-top:18px;"><span class="section-title">Мульти VPN</span></div><div class="tariff-grid">';
-    data.multi.forEach(t => {
-      html += `
-        <div class="tariff-tile" data-buy="multi" data-key="${t.key}" data-name="${t.title}" data-price="${t.price}" data-days="${t.days}" data-maxusers="${t.max_users}">
-          <div class="tariff-tile-icon">${multiIconFor(t.key)}</div>
-          <div class="tariff-tile-name">${t.title}</div>
-          <div class="tariff-tile-days">${t.days} дней · ${t.max_users} чел</div>
-          ${t.original_price ? `<span class="tariff-tile-price-old">${t.original_price} ₽</span>` : ""}
-          <div class="tariff-tile-price">${t.price} ₽</div>
-        </div>
-      `;
-    });
-    html += '</div>';
-
     container.innerHTML = html;
-    container.querySelectorAll("[data-buy]").forEach(card => card.addEventListener("click", () => openBuyConfirm(card.dataset)));
-
     const trialCard = document.getElementById("shop-trial-btn");
     if (trialCard && !trialClaimed) trialCard.onclick = handleTrialClaim;
   } catch (e) {
