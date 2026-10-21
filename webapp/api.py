@@ -281,6 +281,103 @@ async def api_delete_key(key_id: int, user_id: int = Depends(get_current_user_id
     return {"refund": refund, "balance": balance}
 
 
+# ──────────────────────────────────────────────────────────────
+# 📱 Подключённые устройства ключа (кто пользуется вашим VPN)
+# ──────────────────────────────────────────────────────────────
+
+def _check_own_active_key(key, user_id: int):
+    if not key or key["user_id"] != user_id:
+        raise HTTPException(404, "Ключ не найден")
+    if not key["is_active"]:
+        raise HTTPException(400, "Ключ неактивен")
+
+
+async def _resolve_key_panel_email(key) -> str:
+    from xui_api import _resolve_client_email
+
+    ref = (key["proxy_address"] or "").strip()
+    if not ref:
+        raise HTTPException(404, "Ключ не привязан к VPN-серверу")
+    try:
+        email = await asyncio.wait_for(_resolve_client_email(ref), timeout=20)
+    except Exception:
+        email = None
+    if not email:
+        raise HTTPException(503, "VPN-сервер временно не отвечает, попробуйте позже")
+    return email
+
+
+def _normalize_panel_device(d: dict) -> dict:
+    return {
+        "id": d.get("id"),
+        "kind": "device",
+        "model": str(d.get("deviceModel") or "")[:80],
+        "os": str(d.get("deviceOs") or "")[:40],
+        "os_version": str(d.get("osVersion") or "")[:40],
+        "user_agent": str(d.get("userAgent") or "")[:160],
+        "first_seen": d.get("firstSeen") or 0,
+        "last_seen": d.get("lastSeen") or 0,
+    }
+
+
+@app.get("/api/keys/{key_id}/devices")
+async def api_key_devices(key_id: int, user_id: int = Depends(get_current_user_id)):
+    """Список устройств, которые подключались к конкретному ключу пользователя."""
+    if not await is_feature_enabled("profile"):
+        raise HTTPException(403, "Раздел временно отключён")
+    key = await get_key_by_id(key_id)
+    _check_own_active_key(key, user_id)
+    email = await _resolve_key_panel_email(key)
+
+    from xui_api import get_client_devices, get_client_ips
+
+    hwid_devices, ips = await asyncio.gather(
+        get_client_devices(email), get_client_ips(email)
+    )
+
+    devices = [_normalize_panel_device(d) for d in hwid_devices]
+    devices.sort(key=lambda d: d.get("last_seen") or 0, reverse=True)
+    if devices:
+        return {"mode": "hwid", "devices": devices}
+
+    ip_devices = [{"id": None, "kind": "ip", "ip": ip} for ip in sorted(ips)]
+    return {"mode": "ip" if ip_devices else "none", "devices": ip_devices}
+
+
+@app.delete("/api/keys/{key_id}/devices/{device_id}")
+async def api_key_delete_device(key_id: int, device_id: int, user_id: int = Depends(get_current_user_id)):
+    """Отключить конкретное устройство от ключа — оно теряет доступ к VPN."""
+    if not await is_feature_enabled("profile"):
+        raise HTTPException(403, "Раздел временно отключён")
+    key = await get_key_by_id(key_id)
+    _check_own_active_key(key, user_id)
+    email = await _resolve_key_panel_email(key)
+
+    from xui_api import delete_client_device
+
+    ok = await delete_client_device(email, device_id)
+    if not ok:
+        raise HTTPException(502, "Не удалось отключить устройство. Попробуйте ещё раз")
+    return {"ok": True}
+
+
+@app.delete("/api/keys/{key_id}/ip-devices/{ip}")
+async def api_key_delete_ip_device(key_id: int, ip: str, user_id: int = Depends(get_current_user_id)):
+    """Сбросить IP-подключения ключа (для устройств без HWID-идентификатора)."""
+    if not await is_feature_enabled("profile"):
+        raise HTTPException(403, "Раздел временно отключён")
+    key = await get_key_by_id(key_id)
+    _check_own_active_key(key, user_id)
+    email = await _resolve_key_panel_email(key)
+
+    from xui_api import clear_client_ips
+
+    ok = await clear_client_ips(email)
+    if not ok:
+        raise HTTPException(502, "Не удалось отключить устройство. Попробуйте ещё раз")
+    return {"ok": True}
+
+
 @app.get("/api/history")
 async def api_history(page: int = 0, user_id: int = Depends(get_current_user_id)):
     if not await is_feature_enabled("profile"):

@@ -64,7 +64,8 @@ body {
 .topbar, .glass-card, .key-card, .tx-card, .promo-info-card, .contact-card,
 .accordion-item, .admin-menu-btn, .admin-user-row, .admin-action-row, .empty-state,
 .banner-card, .referral-card, .reviews-card, .shop-trial-card, .discount-banner,
-.notif-panel, .modal-content, .bottom-nav, .icon-btn, .balance-chip, .pager-btn {
+.notif-panel, .modal-content, .bottom-nav, .icon-btn, .balance-chip, .pager-btn,
+.devices-card {
   position: relative; isolation: isolate;
   background: var(--glass);
   backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
@@ -79,7 +80,8 @@ body {
 .referral-stat, .key-value, .modal-key-preview, .banner-upload-zone, .input,
 .tx-icon-wrap, .accordion-head-icon, .promo-info-icon, .contact-icon-wrap, .admin-user-avatar,
 .profile-avatar, .review-avatar, .referral-title-icon, .shop-trial-icon, .icon-wrap, .key-tag,
-.key-delete-btn, .admin-icon-btn, .admin-action-row .state {
+.key-delete-btn, .admin-icon-btn, .admin-action-row .state,
+.device-icon, .device-delete-btn, .devices-count {
   position: relative; isolation: isolate;
   background: rgba(22,22,24,.4);
   border: 1px solid rgba(255,255,255,.12);
@@ -223,6 +225,11 @@ body {
 #view-support .welcome-block::before { content: "Это мы на ваши\Aжалобы)"; top: 12px; }
 #view-profile .profile-header::before { content: "Это реально он\Aреально он!"; top: 16px; }
 
+/* «парящие» 104px картинки заголовков не должны залезать на баннеры и карточки ниже:
+   резервируем под них место снизу, чтобы баннер не перекрывал фон/декор соседних блоков */
+#view-shop .welcome-block, #view-promo .welcome-block, #view-support .welcome-block { margin-bottom: 28px; }
+#view-profile .profile-header { margin-bottom: 26px; }
+
 .section { margin-top: 18px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 2px; }
 .section-title { font-size: 12.5px; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; }
@@ -357,8 +364,8 @@ body {
 .tx-date { font-size: 11px; color: var(--text-dim); }
 
 .empty-state { text-align: center; color: var(--text-dim); padding: 34px 20px; font-size: 13.5px; border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.empty-state svg { width: 32px; height: 32px; margin-bottom: 8px; opacity: .6; animation: emptyFloat 2.6s ease-in-out infinite; }
-@keyframes emptyFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.empty-state svg { width: 32px; height: 32px; margin-bottom: 8px; opacity: .6; animation: emptyBreathe 2.4s var(--ease-cloud) infinite; transform-origin: center; }
+@keyframes emptyBreathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.14); } }
 .empty-state .btn { margin-top: 12px; }
 .loading { text-align: center; padding: 30px; color: var(--text-dim); font-size: 13.5px; }
 
@@ -375,6 +382,33 @@ body {
 .pager-btn[disabled] { opacity: .35; cursor: not-allowed; }
 .pager-btn svg { width: 16px; height: 16px; stroke: currentColor; }
 .pager-info { font-size: 12px; color: var(--text-dim); font-weight: 700; }
+
+/* ===== ПОДКЛЮЧЁННЫЕ УСТРОЙСТВА (профиль) ===== */
+.devices-hint { font-size: 11.5px; color: var(--text-dim); margin: -4px 2px 12px; line-height: 1.55; }
+.devices-card { border-radius: var(--radius-sm); padding: 15px 16px; margin-bottom: 10px; }
+.devices-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.devices-title { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14px; min-width: 0; }
+.devices-title svg { width: 15px; height: 15px; color: var(--text-dim); flex: none; }
+.devices-title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.devices-count { font-size: 10.5px; font-weight: 800; color: var(--text-dim); padding: 4px 10px; border-radius: 999px; white-space: nowrap; flex: none; }
+.devices-count.has-devices { color: var(--success); }
+
+.device-row { display: flex; align-items: center; gap: 11px; padding: 11px 2px; }
+.device-row + .device-row { border-top: 1px solid rgba(255,255,255,.08); }
+.device-row.device-enter { animation: deviceIn .3s var(--ease-cloud); }
+@keyframes deviceIn { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+.device-row.removing { animation: deviceOut .28s ease forwards; pointer-events: none; }
+@keyframes deviceOut { to { opacity: 0; transform: translateX(22px) scale(.95); } }
+.device-icon { width: 38px; height: 38px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; }
+.device-icon svg { width: 17px; height: 17px; color: var(--text-dim); }
+.device-info { min-width: 0; flex: 1; }
+.device-name { font-size: 13.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.device-sub { font-size: 11px; color: var(--text-dim); margin-top: 3px; display: flex; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.device-online-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px var(--success); flex: none; animation: blink-dot 1.4s infinite; }
+.device-delete-btn { width: 32px; height: 32px; border-radius: 50%; flex: none; color: var(--danger); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.device-delete-btn svg { width: 14px; height: 14px; }
+.devices-empty { font-size: 12.5px; color: var(--text-dim); padding: 12px 2px 6px; line-height: 1.5; display: flex; align-items: center; gap: 8px; }
+.devices-empty svg { width: 15px; height: 15px; flex: none; opacity: .7; }
 
 /* ===== ПРОФИЛЬ ===== */
 .profile-header { display: flex; align-items: center; gap: 14px; padding: 4px 2px 18px; }
@@ -551,7 +585,8 @@ textarea.input { resize: vertical; min-height: 90px; }
 .admin-action-row .state, .key-card, .tx-card, .shop-trial-card, .banner-card,
 .referral-link-row, .key-value, .key-delete-btn, .modal-key-preview, .pager-btn,
 .link-btn, .review-heart-btn, .review-delete-btn, .banner-upload-zone, .accordion-head,
-.modal-close, .star-select svg, .checkbox-row input, .promo-info-card {
+.modal-close, .star-select svg, .checkbox-row input, .promo-info-card,
+.admin-back, .device-delete-btn {
   transition: var(--press-anim);
   -webkit-tap-highlight-color: transparent;
 }
@@ -560,7 +595,8 @@ textarea.input { resize: vertical; min-height: 90px; }
 .btn:active, .nav-item:active, .icon-btn:active, .balance-chip:active, .theme-swatch:active,
 .admin-icon-btn:active, .admin-action-row .state:active, .key-delete-btn:active,
 .pager-btn:not([disabled]):active, .link-btn:active, .review-heart-btn:active,
-.review-delete-btn:active, .modal-close:active, .star-select svg:active {
+.review-delete-btn:active, .modal-close:active, .star-select svg:active,
+.admin-back:active, .device-delete-btn:active {
   transform: scale(.93);
   opacity: 1;
 }
@@ -576,6 +612,9 @@ textarea.input { resize: vertical; min-height: 90px; }
 .btn[disabled]:active, .shop-trial-card.claimed:active { transform: none; }
 .star-select svg.active { animation: cloudPop .3s var(--ease-cloud); }
 .empty-state .btn, .reviews-actions .btn { will-change: transform; }
+
+/* фирменное "облачное" отпружинивание на отпускание — для всех кнопок */
+.cloud-pop { animation: cloudPop .34s var(--ease-cloud); }
 
 /* плавная смена вкладок и появление модалок в том же характере */
 @keyframes viewIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }

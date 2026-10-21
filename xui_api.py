@@ -147,10 +147,27 @@ async def _panel_call_inner(method: str, path: str, json_body: dict | None, retr
     timeout = httpx.Timeout(XUI_TIMEOUT)
 
     try:
+        client = api.client
         if method == "GET":
-            resp = await api.client._get(url, headers, timeout=timeout)
+            resp = await client._get(url, headers, timeout=timeout)
+        elif method == "DELETE":
+            # В py3xui нет обёртки _delete — делаем DELETE тем же способом,
+            # каким сам py3xui делает _get/_post (те же cookie/CSRF/TLS).
+            req_headers = client._generate_headers(dict(headers))
+            if not client._use_tls_verify:
+                verify: bool | str = False
+            elif client._custom_certificate_path:
+                verify = client._custom_certificate_path
+            else:
+                verify = True
+            async with httpx.AsyncClient(
+                cookies=client.cookies, verify=verify, follow_redirects=True
+            ) as http:
+                resp = await http.delete(url, headers=req_headers, timeout=timeout)
+            resp.raise_for_status()
+            await client._check_response(resp)
         else:
-            resp = await api.client._post(
+            resp = await client._post(
                 url, headers, json_body if json_body is not None else {}, timeout=timeout
             )
         data = resp.json()
@@ -488,6 +505,70 @@ async def get_client_ips(email: str) -> set[str]:
         logger.debug(f"[xui] get_client_ips failed for {email}: {e}")
         return set()
     return _parse_ip_records(raw)
+
+
+# ──────────────────────────────────────────────────────────────
+# 📱 Устройства клиента (HWID-журнал панели)
+# ──────────────────────────────────────────────────────────────
+
+async def get_client_devices(email: str) -> list[dict]:
+    """
+    Список устройств (HWID-лог), которые подключались по ключу клиента.
+    Панель возвращает объекты вида:
+    {id, firstSeen, lastSeen, userAgent, deviceOs, osVersion, deviceModel, fingerprint}.
+    """
+    if not email:
+        return []
+    try:
+        raw = await _panel_call(
+            "POST", f"panel/api/clients/hwids/{quote(email, safe='')}", {}
+        )
+    except Exception as e:
+        logger.debug(f"[xui] get_client_devices failed for {email}: {e}")
+        return []
+    devices: list[dict] = []
+    if isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, dict) and isinstance(item.get("id"), int):
+                devices.append(item)
+    return devices
+
+
+async def delete_client_device(email: str, device_id: int) -> bool:
+    """
+    Удалить конкретное устройство из HWID-лога клиента —
+    после этого устройство теряет доступ к ключу.
+    """
+    if not email or not device_id:
+        return False
+    try:
+        await _panel_call(
+            "DELETE",
+            f"panel/api/clients/hwids/{quote(email, safe='')}/{device_id}",
+        )
+        logger.info(f"[xui] device removed: {email} #{device_id}")
+        return True
+    except Exception as e:
+        logger.warning(f"[xui] delete_client_device failed for {email} #{device_id}: {e}")
+        return False
+
+
+async def clear_client_ips(email: str) -> bool:
+    """
+    Сбросить IP-записи клиента (используется для устройств без HWID,
+    отдельный IP панель удалить не умеет).
+    """
+    if not email:
+        return False
+    try:
+        await _panel_call(
+            "POST", f"panel/api/clients/clearIps/{quote(email, safe='')}", {}
+        )
+        logger.info(f"[xui] ip records cleared: {email}")
+        return True
+    except Exception as e:
+        logger.warning(f"[xui] clear_client_ips failed for {email}: {e}")
+        return False
 
 
 async def get_all_client_emails() -> list[str]:
