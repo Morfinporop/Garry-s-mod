@@ -84,16 +84,31 @@ body {
 
 /* ===== ФОНОВЫЕ КАРТИНКИ: пробный период / реферал / отзывы ===== */
 .shop-trial-card, .referral-card, .reviews-card {
-  background-image:
-    linear-gradient(145deg, rgba(10,10,12,.78), rgba(10,10,12,.62) 55%, rgba(10,10,12,.8));
+  position: relative;
+  isolation: isolate;
+  overflow: hidden; /* обрезаем "вылет" псевдоэлемента по скруглённым краям */
+}
+.shop-trial-card::before,
+.referral-card::before,
+.reviews-card::before {
+  content: "";
+  position: absolute;
+  inset: -24px;           /* фон больше самой карточки на 24px со всех сторон */
+  z-index: -1;            /* под текстом/иконками, но над базовым .glass-фоном */
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  overflow: hidden;
+  pointer-events: none;
 }
-.shop-trial-card { background-image: linear-gradient(145deg, rgba(10,10,12,.8), rgba(10,10,12,.6) 55%, rgba(10,10,12,.82)), var(--img-trial); }
-.referral-card { background-image: linear-gradient(145deg, rgba(10,10,12,.8), rgba(10,10,12,.6) 55%, rgba(10,10,12,.82)), var(--img-referral); }
-.reviews-card { background-image: linear-gradient(145deg, rgba(10,10,12,.8), rgba(10,10,12,.6) 55%, rgba(10,10,12,.82)), var(--img-reviews); }
+.shop-trial-card::before {
+  background-image: linear-gradient(145deg, rgba(10,10,12,.82), rgba(10,10,12,.62) 55%, rgba(10,10,12,.84)), var(--img-trial);
+}
+.referral-card::before {
+  background-image: linear-gradient(145deg, rgba(10,10,12,.82), rgba(10,10,12,.62) 55%, rgba(10,10,12,.84)), var(--img-referral);
+}
+.reviews-card::before {
+  background-image: linear-gradient(145deg, rgba(10,10,12,.82), rgba(10,10,12,.62) 55%, rgba(10,10,12,.84)), var(--img-reviews);
+}
 
 /* ===== ОБЛАЧНЫЕ БЕЛЫЕ ЭЛЕМЕНТЫ (только акцентные кнопки/бейджи) ===== */
 .btn-primary, .badge-chip, .nav-item.active, .shop-trial-btn {
