@@ -1,10 +1,8 @@
-/* FlowVPN — Flat glass, theme-aware, no clouds */
+/* FlowVPN — Flat glass + subtle clouds, theme-aware, stable backgrounds */
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
 /* ===================================================================
-   ТЕМА: тёмная (по умолчанию) и светлая.
-   Переключение в JS: document.documentElement.setAttribute('data-theme','light'|'dark')
-   Акцент (--accent) не зависит от темы — его меняют свотчи/кастомный цвет.
+   ТЕМА
    =================================================================== */
 :root {
   --bg: #000;
@@ -14,12 +12,12 @@
   --img-referral: url('https://i.pinimg.com/736x/33/98/66/339866fd3b9343a460f9c2a170f428e2.jpg');
   --img-reviews: url('https://i.pinimg.com/736x/9c/6b/97/9c6b976a8ecbc23da98ab7435a1635bc.jpg');
 
-  --blur: blur(22px) saturate(180%);
+  --blur: blur(20px) saturate(180%);
 
-  /* плоские чёрные полупрозрачные поверхности — никакого серого/градиента */
-  --surface: rgba(0,0,0,.45);
-  --surface-2: rgba(0,0,0,.6);
-  --surface-3: rgba(0,0,0,.72);
+  /* Единый градиент для ВСЕХ стеклянных фонов — как в шапке: слева серый, справа чернее */
+  --panel-gradient: linear-gradient(90deg, rgba(130,130,130,.42) 0%, rgba(0,0,0,.72) 100%);
+  /* Полностью непрозрачная версия — для уведомлений и нижней панели */
+  --panel-gradient-opaque: linear-gradient(90deg, #6e6e6e 0%, #050505 100%);
 
   --border: rgba(255,255,255,.14);
   --edge: 1px solid var(--border);
@@ -32,7 +30,6 @@
   --text: #fff;
   --text-dim: rgba(255,255,255,.62);
 
-  /* акцент — отдельная система, не зависит от темы */
   --accent: #fff;
   --accent-text: #0a0a0a;
   --accent-soft: rgba(255,255,255,.18);
@@ -51,12 +48,9 @@
   --radius-sm: 20px;
 }
 
-/* светлая тема — просто инвертируем базовые переменные */
 [data-theme="light"] {
-  --bg: #efefef;
-  --surface: rgba(255,255,255,.55);
-  --surface-2: rgba(255,255,255,.7);
-  --surface-3: rgba(255,255,255,.82);
+  --panel-gradient: linear-gradient(90deg, rgba(255,255,255,.78) 0%, rgba(180,180,180,.55) 100%);
+  --panel-gradient-opaque: linear-gradient(90deg, #ffffff 0%, #c7c7c7 100%);
 
   --border: rgba(0,0,0,.12);
   --handle: rgba(0,0,0,.25);
@@ -68,6 +62,7 @@
   --text-dim: rgba(0,0,0,.55);
 
   --skeleton-shine: rgba(0,0,0,.08);
+  --overlay: rgba(0,0,0,.45);
 }
 
 html, body {
@@ -75,46 +70,67 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
   overflow: hidden;
 }
+
+/* ===================================================================
+   ФОНОВОЕ ИЗОБРАЖЕНИЕ — отдельным фиксированным слоем,
+   чтобы НЕ перерисовывалось/не мигало при переключении вкладок
+   =================================================================== */
 body {
   position: relative; isolation: isolate;
-  background-image: var(--bg-image);
-  background-size: cover; background-position: center; background-attachment: fixed;
+  background: transparent;
   transition: background-color .25s ease, color .25s ease;
+}
+body::before {
+  content: "";
+  position: fixed; inset: 0; z-index: -2;
+  background-image: var(--bg-image);
+  background-size: cover; background-position: center;
+  transform: translateZ(0);
+  will-change: transform;
+  pointer-events: none;
 }
 #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; position: relative; z-index: 1; }
 
 /* ===================================================================
-   БАЗА: плоское чёрное/белое стекло в зависимости от темы.
-   Никаких облаков, никаких градиентов, никакого серого подмешивания.
+   БАЗА: единый градиентный полупрозрачный фон для всех стеклянных поверхностей
    =================================================================== */
 .topbar, .glass-card, .key-card, .tx-card, .promo-info-card, .contact-card,
 .accordion-item, .admin-menu-btn, .admin-user-row, .admin-action-row, .empty-state,
-.banner-card, .referral-card, .reviews-card, .shop-trial-card, .discount-banner,
-.notif-panel, .modal-content, .bottom-nav, .icon-btn, .balance-chip, .pager-btn,
+.discount-banner, .modal-content, .icon-btn, .balance-chip, .pager-btn,
 .btn-secondary, .btn-outline, .referral-link-row, .review-heart-btn, .review-heart-static,
-.skeleton, .star-select, .tx-section {
-  background: var(--surface);
-  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+.skeleton, .star-select, .tx-section, .referral-stat, .key-value, .modal-key-preview,
+.promo-result, .banner-upload-zone, .input,
+.tx-icon-wrap, .accordion-head-icon, .promo-info-icon, .contact-icon-wrap, .admin-user-avatar,
+.profile-avatar, .review-avatar, .referral-title-icon, .shop-trial-icon, .icon-wrap, .key-tag,
+.key-delete-btn, .admin-icon-btn, .admin-action-row .state {
+  background: var(--panel-gradient);
   border: var(--edge);
   box-shadow: var(--shine), var(--shadow-sm);
   color: var(--text);
   transition: background-color .25s ease, border-color .25s ease, color .25s ease;
 }
-
-/* более плотные/мелкие элементы — чуть темнее/светлее своей поверхности */
-.referral-stat, .key-value, .modal-key-preview, .promo-result, .banner-upload-zone, .input,
-.tx-icon-wrap, .accordion-head-icon, .promo-info-icon, .contact-icon-wrap, .admin-user-avatar,
-.profile-avatar, .review-avatar, .referral-title-icon, .shop-trial-icon, .icon-wrap, .key-tag,
-.key-delete-btn, .admin-icon-btn, .admin-action-row .state {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  box-shadow: inset 0 1px 0 var(--highlight);
-  transition: background-color .25s ease, border-color .25s ease;
+/* Эти поверхности используют blur-стекло (не слишком много, чтобы не грузить рендер) */
+.topbar, .glass-card, .key-card, .tx-card, .promo-info-card, .contact-card,
+.accordion-item, .admin-menu-btn, .admin-user-row, .admin-action-row, .empty-state,
+.discount-banner, .modal-content, .btn-secondary, .btn-outline, .referral-link-row,
+.skeleton, .star-select, .tx-section {
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
 }
 
 /* ===================================================================
-   АКЦЕНТНЫЕ ЭЛЕМЕНТЫ — плоская заливка цветом темы-акцента,
-   без псевдоэлементов, без "облаков", ничего не прыгает.
+   МЯГКИЕ "ОБЛАЧКА" — только на статичных карточках (не скроллятся сами),
+   простое радиальное свечение, без тяжёлых SVG-фильтров и без дрожания
+   =================================================================== */
+.glass-card, .key-card, .tx-card, .promo-info-card, .contact-card,
+.accordion-item, .admin-menu-btn, .admin-user-row, .admin-action-row,
+.empty-state, .discount-banner, .tx-section {
+  background:
+    radial-gradient(ellipse 140% 90% at 15% 0%, rgba(255,255,255,.10), transparent 60%),
+    var(--panel-gradient);
+}
+
+/* ===================================================================
+   АКЦЕНТНЫЕ ЭЛЕМЕНТЫ (не зависят от темы, цвет настраивается отдельно)
    =================================================================== */
 .btn-primary, .badge-chip, .nav-item.active, .shop-trial-btn {
   background: var(--accent);
@@ -152,6 +168,7 @@ body {
 .topbar {
   flex: none; display: flex; align-items: center; justify-content: space-between;
   margin: 10px 12px 4px; padding: 10px 12px; border-radius: 26px; position: relative; z-index: 20;
+  transform: translateZ(0);
 }
 .topbar-left { display: flex; align-items: center; gap: 9px; }
 .logo-mark { width: 52px; height: 52px; border-radius: 12px; flex: none; overflow: hidden; }
@@ -173,11 +190,16 @@ body {
 .balance-chip svg { width: 13px; height: 13px; color: var(--text-dim); flex: none; }
 .balance-chip.flash { box-shadow: var(--shine), 0 0 22px rgba(255,255,255,.5); }
 
+/* УВЕДОМЛЕНИЯ — полностью непрозрачные, без blur */
 .notif-panel {
   position: absolute; top: 46px; right: 0; width: 280px; max-height: 340px; overflow-y: auto;
   border-radius: var(--radius-sm); padding: 8px; z-index: 50; display: none; cursor: default;
   animation: dropIn .18s ease; text-align: left;
-  background: var(--surface-3); /* панель плотнее, чтобы хорошо читалась поверх контента */
+  background: var(--panel-gradient-opaque);
+  border: var(--edge);
+  box-shadow: var(--shine), var(--shadow);
+  color: var(--text);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
 }
 @keyframes dropIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 .notif-panel.open { display: block; }
@@ -192,8 +214,8 @@ body {
 #views { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 6px 16px 130px; scrollbar-width: none; }
 #views::-webkit-scrollbar { display: none; }
 .view { display: none; }
-.view.active { display: block; opacity: 0; transform: translateY(10px); animation: viewIn .32s cubic-bezier(.22,1,.36,1) forwards; }
-@keyframes viewIn { to { opacity: 1; transform: none; } }
+.view.active { display: block; opacity: 0; animation: viewIn .28s ease forwards; }
+@keyframes viewIn { to { opacity: 1; } }
 
 .welcome-block { padding: 14px 2px 4px; position: relative; }
 .welcome-block h1 { font-size: 22px; font-weight: 800; margin-bottom: 12px; line-height: 1.25; letter-spacing: -.3px; position: relative; z-index: 2; text-shadow: 0 2px 12px rgba(0,0,0,.5); }
@@ -245,7 +267,7 @@ body {
 .reviews-actions .btn[disabled] { opacity: .5; }
 
 /* ===================================================================
-   МАГАЗИН (пробный период) — фото-фон, текст всегда белый (фон тёмный)
+   МАГАЗИН (пробный период) — фото-фон, текст всегда белый
    =================================================================== */
 .discount-banner { border-radius: var(--radius-sm); padding: 13px 15px; font-size: 13px; margin-bottom: 16px; display: flex; align-items: center; gap: 9px; }
 .discount-banner svg { width: 16px; height: 16px; flex: none; }
@@ -256,7 +278,8 @@ body {
   overflow: hidden; cursor: pointer; transition: transform .15s, opacity .2s; gap: 12px;
   background-image: linear-gradient(145deg, rgba(0,0,0,.6), rgba(0,0,0,.78)), var(--img-trial);
   background-size: cover; background-position: center;
-  color: #fff; --text-dim: rgba(255,255,255,.65); /* на фото всегда белый текст, независимо от темы */
+  color: #fff; --text-dim: rgba(255,255,255,.65);
+  border: var(--edge);
 }
 .shop-trial-card:active { transform: scale(.97); }
 .shop-trial-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -270,11 +293,11 @@ body {
 .shop-trial-btn:disabled { background: rgba(255,255,255,.25) !important; color: rgba(255,255,255,.5) !important; }
 
 /* ===================================================================
-   БАННЕРЫ
+   БАННЕРЫ — горизонтальный скролл, фон плоский, без облаков
    =================================================================== */
 .banners-slider { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; margin-bottom: 4px; padding-bottom: 4px; }
 .banners-slider::-webkit-scrollbar { display: none; }
-.banner-card { flex: 0 0 100%; scroll-snap-align: start; border-radius: var(--radius); overflow: hidden; cursor: pointer; }
+.banner-card { flex: 0 0 100%; scroll-snap-align: start; border-radius: var(--radius); overflow: hidden; cursor: pointer; border: var(--edge); }
 .banner-card img { width: 100%; display: block; max-height: 160px; object-fit: cover; }
 
 /* ===================================================================
@@ -285,30 +308,37 @@ body {
   background-image: linear-gradient(160deg, rgba(0,0,0,.62), rgba(0,0,0,.8)), var(--img-referral);
   background-size: cover; background-position: center;
   color: #fff; --text-dim: rgba(255,255,255,.65);
+  border: var(--edge);
+  position: relative;
 }
-.referral-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.referral-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; position: relative; z-index: 2; }
 .referral-title-icon { width: 38px; height: 38px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.15); }
 .referral-title-icon svg { width: 18px; height: 18px; }
 .referral-title { font-size: 16px; font-weight: 800; }
-.referral-stats-row { display: flex; gap: 10px; margin-bottom: 14px; }
-.referral-stat { flex: 1; border-radius: 18px; padding: 13px 10px; text-align: center; background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.15); }
+.referral-stats-row { display: flex; gap: 10px; margin-bottom: 14px; position: relative; z-index: 1; }
+.referral-stat { flex: 1; border-radius: 18px; padding: 13px 10px; text-align: center; background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.15); position: relative; z-index: 1; }
 .referral-stat-value { font-size: 21px; font-weight: 800; margin-bottom: 3px; line-height: 1; }
 .referral-stat-label { font-size: 11px; color: var(--text-dim); font-weight: 700; }
-.referral-hint { font-size: 12.5px; color: var(--text-dim); margin-bottom: 14px; line-height: 1.5; }
+/* Текст с бонусом ("получите 2₽" и т.п.) — ВСЕГДА поверх блоков статистики */
+.referral-hint {
+  position: relative; z-index: 5;
+  font-size: 12.5px; color: var(--text-dim); margin-bottom: 14px; line-height: 1.5;
+}
 .referral-hint b { color: #fff; }
-.referral-link-row { display: flex; align-items: center; gap: 9px; border-radius: 16px; padding: 12px 13px; cursor: pointer; transition: transform .12s; background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.15); }
+.referral-link-row { display: flex; align-items: center; gap: 9px; border-radius: 16px; padding: 12px 13px; cursor: pointer; transition: transform .12s; background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.15); position: relative; z-index: 1; }
 .referral-link-row:active { transform: scale(.98); }
 .referral-link-row svg { width: 15px; height: 15px; flex: none; }
 .referral-link-text { font-family: monospace; font-size: 11.5px; word-break: break-all; flex: 1; }
 
 /* ===================================================================
-   ОТЗЫВЫ — фото-фон, текст всегда белый, карточки отзывов — плоские
+   ОТЗЫВЫ (сводная карточка) — фото-фон, текст всегда белый
    =================================================================== */
 .reviews-card {
   text-align: center; padding: 20px 18px; border-radius: var(--radius);
   background-image: linear-gradient(160deg, rgba(0,0,0,.62), rgba(0,0,0,.8)), var(--img-reviews);
   background-size: cover; background-position: center;
   color: #fff; --text-dim: rgba(255,255,255,.65);
+  border: var(--edge);
 }
 .reviews-score { font-size: 34px; font-weight: 800; line-height: 1; }
 .reviews-count { font-size: 12px; color: var(--text-dim); margin: 4px 0 12px; }
@@ -319,7 +349,22 @@ body {
 .reviews-actions { display: flex; gap: 10px; }
 .reviews-actions .btn { flex: 1; }
 
-/* список "все отзывы" — обычный плоский фон темы, не фото, не двигается */
+/* ===================================================================
+   МОДАЛКА "ВСЕ ОТЗЫВЫ" с картинкой-фоном.
+   !!! Добавьте класс "reviews-photo-bg" на .modal-content этого модального окна в index.html
+   =================================================================== */
+.modal-content.reviews-photo-bg {
+  background-image: linear-gradient(160deg, rgba(0,0,0,.72), rgba(0,0,0,.88)), var(--img-reviews);
+  background-size: cover; background-position: center;
+  background-attachment: local; /* картинка остаётся на месте при скролле списка */
+  color: #fff;
+}
+.modal-content.reviews-photo-bg .review-item-comment,
+.modal-content.reviews-photo-bg .review-item-date,
+.modal-content.reviews-photo-bg .notif-empty,
+.modal-content.reviews-photo-bg .section-title { color: rgba(255,255,255,.65); }
+
+/* список отзывов — не скроллится сам по себе (скроллится вся модалка), фон плоский */
 .review-item { padding: 13px 0; border-bottom: 1px solid var(--border); }
 .review-item:first-child { padding-top: 0; }
 .review-item:last-child { border-bottom: none; }
@@ -500,7 +545,6 @@ textarea.input { resize: vertical; min-height: 90px; }
 .modal-content {
   position: relative; border-radius: 32px 32px 0 0; padding: 28px 20px 24px; width: 100%; max-width: 480px;
   max-height: 85vh; overflow-y: auto; animation: sheetUp .25s ease;
-  background: var(--surface-3);
 }
 @keyframes sheetUp { from { transform: translateY(30px); opacity: .5; } to { transform: none; opacity: 1; } }
 .modal-content::before { content: ""; position: absolute; top: 9px; left: 50%; transform: translateX(-50%); width: 40px; height: 4px; border-radius: 3px; background: var(--handle); z-index: 2; }
@@ -514,14 +558,12 @@ textarea.input { resize: vertical; min-height: 90px; }
 .banner-modal-actions .btn { flex: 1; }
 
 /* ===================================================================
-   СВОТЧИ ТЕМЫ (акцентный цвет) — показывают свой реальный цвет,
-   не перекрываются стеклом/облаком
+   СВОТЧИ АКЦЕНТНОГО ЦВЕТА
    =================================================================== */
 .theme-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
 .theme-swatch {
   aspect-ratio: 1; border-radius: 50%; border: 2px solid var(--border); cursor: pointer;
   transition: transform .12s, border-color .2s;
-  /* фактический цвет свотча задаётся в JS через style="background:..." для каждого элемента */
 }
 .theme-swatch:active { transform: scale(.92); }
 .theme-swatch.active { border-color: var(--accent); box-shadow: 0 0 14px rgba(255,255,255,.5); }
@@ -529,13 +571,16 @@ textarea.input { resize: vertical; min-height: 90px; }
 .theme-custom-row input[type="color"] { width: 48px; height: 44px; border: var(--edge); border-radius: 14px; background: transparent; cursor: pointer; }
 
 /* ===================================================================
-   НИЖНЕЕ МЕНЮ — статично, без облаков, без смещений.
-   Контейнер — плоская панель, активный таб — просто заливка акцентом.
+   НИЖНЕЕ МЕНЮ — полностью непрозрачное, тот же градиент, без blur
    =================================================================== */
 .bottom-nav-wrap { position: fixed; left: 0; right: 0; bottom: calc(18px + env(safe-area-inset-bottom, 0)); display: flex; justify-content: center; z-index: 40; pointer-events: none; }
 .bottom-nav {
   pointer-events: auto; display: flex; overflow-x: auto; border-radius: 999px; max-width: 96vw; padding: 4px;
-  background: var(--surface-3);
+  background: var(--panel-gradient-opaque);
+  border: var(--edge);
+  box-shadow: var(--shine), 0 16px 44px rgba(0,0,0,.6);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  transform: translateZ(0);
 }
 .bottom-nav::-webkit-scrollbar { display: none; }
 .nav-item {
