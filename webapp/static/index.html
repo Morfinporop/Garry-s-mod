@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>FlowVPN</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="/style.css?v=12">
+<link rel="stylesheet" href="/style.css?v=13">
 </head>
 <body>
 
@@ -905,6 +905,8 @@ async function loadReferralBlock() {
             <span class="referral-title">Реферальный бонус</span>
           </div>
 
+          <div class="referral-hint">Получайте <b>${data.bonus_per_referral} ₽</b> за каждого друга, который запустит бота по вашей ссылке!</div>
+
           <div class="referral-stats-row">
             <div class="referral-stat">
               <div class="referral-stat-value">${data.invited_count}</div>
@@ -915,8 +917,6 @@ async function loadReferralBlock() {
               <div class="referral-stat-label">Заработано</div>
             </div>
           </div>
-
-          <div class="referral-hint">Получайте <b>${data.bonus_per_referral} ₽</b> за каждого друга, который запустит бота по вашей ссылке!</div>
 
           ${link ? `
             <div class="referral-link-row" id="referral-link-row">
