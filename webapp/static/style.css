@@ -490,6 +490,33 @@ textarea.input { resize: vertical; min-height: 90px; }
 .nav-item:active { transform: scale(.94); }
 .nav-item.active { color: var(--accent-text); }
 
+.subscription-card { margin: 0 0 18px; padding: 18px 16px; border-radius: var(--radius); }
+.subscription-title { font-size: 12px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; margin-bottom: 10px; color: var(--text); }
+.subscription-desc { font-size: 12px; color: var(--text-dim); line-height: 1.55; margin-bottom: 16px; }
+.subscription-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.subscription-chips { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; min-width: 0; }
+.subscription-chip {
+  position: relative; isolation: isolate;
+  background: transparent; border: none; cursor: pointer;
+  padding: 10px 14px; font-size: 12px; font-weight: 800;
+  color: var(--accent-text); font-family: inherit;
+  border-radius: 999px;
+  transition: transform .12s;
+}
+.subscription-chip::before {
+  content: ""; position: absolute; inset: -2px; z-index: -1;
+  background: var(--accent); border-radius: 999px;
+  filter: url(#cloud);
+  box-shadow: 0 0 14px rgba(255,255,255,.2);
+  opacity: .5;
+  transition: opacity .15s, box-shadow .15s;
+}
+.subscription-chip.selected::before { opacity: 1; box-shadow: 0 0 18px rgba(255,255,255,.5); }
+.subscription-chip:active { transform: scale(.93); }
+.subscription-buy { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: none; }
+.subscription-price { font-size: 13px; font-weight: 800; white-space: nowrap; }
+.subscription-buy-btn { padding: 10px 20px; font-size: 13px; white-space: nowrap; }
+
 @media (hover: hover) and (pointer: fine) {
   .btn:hover { filter: brightness(1.08); }
   .contact-card:hover, .admin-menu-btn:hover, .key-card:hover, .tx-card:hover { transform: translateY(-2px); }
