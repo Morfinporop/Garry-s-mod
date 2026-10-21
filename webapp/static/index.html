@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>FlowVPN</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="/style.css?v=18">
+<link rel="stylesheet" href="/style.css?v=19">
 </head>
 <body>
 
@@ -108,6 +108,12 @@
       <div class="section" style="margin-top:0;">
         <div class="section-header"><span class="section-title">Мои ключи</span></div>
         <div id="profile-keys"></div>
+      </div>
+
+      <div class="section" id="profile-devices-section" style="display:none;">
+        <div class="section-header"><span class="section-title">Подключённые устройства</span></div>
+        <div class="devices-hint">Здесь видно, какие устройства пользуются вашим ключом. Если заметили чужое — просто отключите его, и оно потеряет доступ к VPN.</div>
+        <div id="profile-devices"></div>
       </div>
     </section>
 
@@ -428,6 +434,34 @@ function haptic(type = 'impact', param = 'light') {
     else if (type === 'selection') tg.HapticFeedback.selectionChanged();
   } catch (e) {}
 }
+
+/* ============ Облачная анимация нажатия — как у облачков в магазине, для всех элементов ============ */
+const CLOUD_PRESS_SEL = [
+  ".btn", ".subscription-chip", ".nav-item", ".icon-btn", ".balance-chip", ".theme-swatch",
+  ".contact-card", ".admin-menu-btn", ".admin-user-row", ".admin-action-row", ".admin-icon-btn",
+  ".admin-back", ".key-delete-btn", ".device-delete-btn", ".pager-btn", ".link-btn",
+  ".review-heart-btn", ".review-delete-btn", ".modal-close", ".star-select svg",
+  ".shop-trial-card", ".banner-card", ".key-card", ".tx-card", ".referral-link-row",
+  ".key-value", ".modal-key-preview", ".banner-upload-zone", ".accordion-head", ".promo-info-card"
+].join(",");
+let cloudPressEl = null;
+document.addEventListener("pointerdown", (e) => {
+  const t = e.target && e.target.closest ? e.target.closest(CLOUD_PRESS_SEL) : null;
+  cloudPressEl = (t && !t.disabled && !t.hasAttribute("disabled") && !t.classList.contains("claimed")) ? t : null;
+}, true);
+document.addEventListener("pointerup", (e) => {
+  if (!cloudPressEl) return;
+  const el = cloudPressEl;
+  cloudPressEl = null;
+  if (!(e.target && e.target.closest && e.target.closest(CLOUD_PRESS_SEL) === el)) return;
+  el.classList.remove("cloud-pop");
+  void el.offsetWidth;
+  el.classList.add("cloud-pop");
+}, true);
+document.addEventListener("pointercancel", () => { cloudPressEl = null; }, true);
+document.addEventListener("animationend", (e) => {
+  if (e.animationName === "cloudPop") e.target.classList.remove("cloud-pop");
+}, true);
 
 function getInitData() {
   if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
@@ -1463,6 +1497,7 @@ async function loadProfileKeys() {
     lastKeysHash = JSON.stringify(keys);
     if (!keys.length) {
       renderEmptyState(keysContainer, "Нет активных ключей", null, `<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>`);
+      loadProfileDevices([]);
     } else {
       keysContainer.innerHTML = keys.map(k => {
         let mark = "Личный";
@@ -1507,11 +1542,172 @@ async function loadProfileKeys() {
           if (key) openDeleteKeyModal(key);
         };
       });
+      loadProfileDevices(keys);
     }
   } catch (e) {
     renderEmptyState(keysContainer, e.message, loadProfileKeys);
+    loadProfileDevices([]);
   }
 }
+
+/* ============ Подключённые устройства ключей (кому раздали VPN) ============ */
+let lastProfileKeys = [];
+let devicesLoadSeq = 0;
+
+function pluralRu(n, one, few, many) {
+  const mod100 = Math.abs(n) % 100, mod10 = mod100 % 10;
+  if (mod100 > 10 && mod100 < 20) return many;
+  if (mod10 > 1 && mod10 < 5) return few;
+  if (mod10 === 1) return one;
+  return many;
+}
+
+function deviceIconSvg(kind) {
+  const paths = {
+    phone: `<rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/>`,
+    monitor: `<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>`,
+    chip: `<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/>`,
+  };
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths[kind] || paths.chip}</svg>`;
+}
+
+function deviceKind(d) {
+  const s = `${d.os || ""} ${d.model || ""}`.toLowerCase();
+  if (/android|iphone|ipad|ios/.test(s)) return "phone";
+  if (/windows|macos|macbook|linux|ubuntu|debian|fedora/.test(s)) return "monitor";
+  return "chip";
+}
+
+function deviceName(d) {
+  if (d.kind === "ip") return "Устройство без имени";
+  if (d.model) return d.model;
+  const osStr = [d.os, d.os_version].filter(Boolean).join(" ");
+  return osStr || "Неизвестное устройство";
+}
+
+function deviceSubline(d) {
+  if (d.kind === "ip") return d.ip ? `IP ${d.ip}` : "";
+  if (!d.model) return ""; // имя уже состоит из ОС, не дублируем
+  const osStr = [d.os, d.os_version].filter(Boolean).join(" ");
+  return osStr && osStr !== d.model ? osStr : "";
+}
+
+function formatDeviceSeen(ts) {
+  let ms = Number(ts) || 0;
+  if (ms > 0 && ms < 1e12) ms *= 1000; // панель может отдать секунды вместо миллисекунд
+  if (!ms) return "";
+  const diff = Date.now() - ms;
+  if (diff < 3 * 60 * 1000) return "online";
+  const mins = Math.max(1, Math.round(diff / 60000));
+  if (mins < 60) return `${mins} ${pluralRu(mins, "минуту", "минуты", "минут")} назад`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} ${pluralRu(hours, "час", "часа", "часов")} назад`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days} ${pluralRu(days, "день", "дня", "дней")} назад`;
+  return new Date(ms).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+}
+
+function devicesGroupHtml(key, data, failed) {
+  const lockIcon = `<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>`;
+  const shieldIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>`;
+  let inner = "";
+  let countLabel = `<span class="devices-count">0 устройств</span>`;
+  if (failed) {
+    inner = `<div class="devices-empty" data-devices-retry style="cursor:pointer;">${shieldIcon}<span>Не удалось проверить устройства. <u>Повторить</u></span></div>`;
+  } else if (!data.devices.length) {
+    inner = `<div class="devices-empty">${shieldIcon}<span>Чужих подключений нет — ключ только у вас</span></div>`;
+  } else {
+    const n = data.devices.length;
+    countLabel = `<span class="devices-count has-devices">${n} ${pluralRu(n, "устройство", "устройства", "устройств")}</span>`;
+    inner = data.devices.map((d, i) => {
+      const seen = formatDeviceSeen(d.last_seen);
+      const online = seen === "online";
+      const subParts = [];
+      const base = deviceSubline(d);
+      if (base) subParts.push(base);
+      subParts.push(online ? "сейчас в сети" : (seen ? `активно ${seen}` : "подключался ранее"));
+      return `
+        <div class="device-row device-enter" style="animation-delay:${Math.min(i * 50, 250)}ms" data-keyid="${key.id}" ${d.id != null ? `data-devid="${d.id}"` : ""} ${d.ip ? `data-ip="${esc(d.ip)}"` : ""}>
+          <div class="device-icon">${deviceIconSvg(deviceKind(d))}</div>
+          <div class="device-info">
+            <div class="device-name">${esc(deviceName(d))}</div>
+            <div class="device-sub">${online ? '<span class="device-online-dot"></span>' : ""}${esc(subParts.join(" · "))}</div>
+          </div>
+          <div class="device-delete-btn" title="Отключить от VPN">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </div>
+        </div>`;
+    }).join("");
+  }
+  return `
+    <div class="devices-card">
+      <div class="devices-head">
+        <div class="devices-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${lockIcon}</svg>
+          <span>${esc(key.tariff)}</span>
+        </div>
+        ${countLabel}
+      </div>
+      ${inner}
+    </div>`;
+}
+
+function wireDeviceRows(box) {
+  box.querySelectorAll("[data-devices-retry]").forEach(el => {
+    el.onclick = () => loadProfileDevices(lastProfileKeys);
+  });
+  box.querySelectorAll(".device-row").forEach(row => {
+    const btn = row.querySelector(".device-delete-btn");
+    if (!btn) return;
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const nameEl = row.querySelector(".device-name");
+      const name = nameEl ? nameEl.textContent : "устройство";
+      tg.showConfirm(`Отключить «${name}» от вашего VPN?\nУстройство больше не сможет пользоваться этим ключом.`, async (ok) => {
+        if (!ok) return;
+        row.classList.add("removing");
+        try {
+          const keyId = row.dataset.keyid;
+          if (row.dataset.devid) {
+            await api(`/api/keys/${keyId}/devices/${row.dataset.devid}`, { method: "DELETE" });
+          } else {
+            await api(`/api/keys/${keyId}/ip-devices/${encodeURIComponent(row.dataset.ip || "")}`, { method: "DELETE" });
+          }
+          haptic('notification', 'success');
+          setTimeout(() => loadProfileDevices(lastProfileKeys), 300);
+        } catch (err) {
+          row.classList.remove("removing");
+          haptic('notification', 'error');
+          tg.showAlert(err.message);
+        }
+      });
+    };
+  });
+}
+
+async function loadProfileDevices(keys) {
+  const section = document.getElementById("profile-devices-section");
+  const box = document.getElementById("profile-devices");
+  if (!section || !box) return;
+  const list = Array.isArray(keys) ? keys : [];
+  lastProfileKeys = list;
+  if (!list.length) {
+    section.style.display = "none";
+    box.innerHTML = "";
+    return;
+  }
+  section.style.display = "";
+  const seq = ++devicesLoadSeq;
+  box.innerHTML = skeletonBlock(64, Math.min(list.length, 2));
+  const results = await Promise.all(list.map(async (k) => {
+    try { return { key: k, data: await api(`/api/keys/${k.id}/devices`), failed: false }; }
+    catch (e) { return { key: k, data: null, failed: true }; }
+  }));
+  if (seq !== devicesLoadSeq) return; // прилетела устаревшая загрузка
+  box.innerHTML = results.map(r => devicesGroupHtml(r.key, r.data, r.failed)).join("");
+  wireDeviceRows(box);
+}
+/* ============ конец блока устройств ============ */
 
 let pendingDeleteKeyId = null;
 
@@ -1731,8 +1927,8 @@ function renderFaq() {
 const adminState = { view: "menu", uid: null, currentBannerPlacement: "home" };
 
 function adminBack(to = "menu") { adminState.view = to; adminRender(); }
-function adminHeader(title) {
-  return `<div class="admin-back" onclick="adminBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>${title}</div>`;
+function adminHeader(title, to = "menu") {
+  return `<div class="admin-back" onclick="adminBack('${esc(to)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>${title}</div>`;
 }
 window.adminBack = adminBack;
 
@@ -1926,12 +2122,12 @@ let adminUserHistoryPage = 0;
 
 async function adminRenderUser(c) {
   const uid = adminState.uid;
-  c.innerHTML = adminHeader("Пользователь") + skeletonBlock(140);
+  c.innerHTML = adminHeader("Пользователь", "users") + skeletonBlock(140);
   try {
     const data = await api(`/api/admin/users/${uid}`);
     const u = data.user;
 
-    let html = adminHeader("Пользователь");
+    let html = adminHeader("Пользователь", "users");
     html += `<div class="glass-card" style="display:flex;gap:14px;align-items:center;margin-bottom:16px;">`;
     html += `<div class="profile-avatar" id="admin-avatar-wrap" style="margin:0;">${personIconSvg()}</div>`;
     html += `<div><div class="profile-name">${u.username ? esc("@" + u.username) : "без ника"}</div><div class="profile-id">ID ${u.user_id} · ${esc(u.registered_at || "дата неизвестна")}</div></div>`;
@@ -2015,7 +2211,7 @@ async function adminRenderUser(c) {
     loadAdminUserHistory(uid);
 
   } catch (e) {
-    c.innerHTML = adminHeader("Пользователь");
+    c.innerHTML = adminHeader("Пользователь", "users");
     const box = document.createElement("div");
     c.appendChild(box);
     renderEmptyState(box, e.message, () => adminRenderUser(c));
