@@ -353,11 +353,17 @@ async def api_key_delete_device(key_id: int, device_id: int, user_id: int = Depe
     _check_own_active_key(key, user_id)
     email = await _resolve_key_panel_email(key)
 
-    from xui_api import delete_client_device
+    from xui_api import delete_client_device, clear_client_ips
 
     ok = await delete_client_device(email, device_id)
     if not ok:
         raise HTTPException(502, "Не удалось отключить устройство. Попробуйте ещё раз")
+
+    # ВАЖНО: вместе с HWID-записью убираем и IP-записи клиента,
+    # иначе устройство останется висеть «безымянным» IP-подключением
+    # и фактически не отключится от VPN.
+    if not await clear_client_ips(email):
+        logger.warning(f"[devices] HWID {device_id} удалён, но IP-записи {email} очистить не удалось")
     return {"ok": True}
 
 
