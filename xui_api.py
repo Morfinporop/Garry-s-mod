@@ -1,4 +1,5 @@
 import asyncio
+import ipaddress
 import json
 import logging
 import logging.handlers
@@ -406,6 +407,99 @@ async def delete_vpn_user(client_ref: str) -> None:
         logger.exception(f"[xui] delete failed: {client_ref}")
 
 
+def _build_client_update_payload(rec: dict, overrides: dict) -> dict | None:
+    """
+    Готовит payload для POST panel/api/clients/update/{email} из карточки
+    клиента (ответ panel/api/clients/get/{email}) + точечные изменения.
+
+    ВАЖНО: «update» — это editor round-trip: панель перезаписывает ВСЕ поля
+    клиента из запроса (enable, expiryTime, tgId, limitHwid и т.д. не
+    сохраняются сами по себе). Поэтому мы отдаём назад всю карточку как
+    есть, меняя только overrides — иначе случайно обнулить тоже легко.
+
+    Особенности форматов:
+    - в карточке "id" — числовой id записи, а update ждёт в "id" строку-UUID
+      (uuid приезжает в поле "uuid");
+    - "allowedIPs" в карточке — строка, в update — массив строк;
+    - "reverse" в карточке — JSON-строка, в update — объект.
+    """
+    if not isinstance(rec, dict) or not rec.get("email"):
+        return None
+
+    payload = dict(rec)
+    rec_id = payload.get("id")
+    # Числовой id записи туда отправлять нельзя (Go ждёт строку).
+    if not isinstance(rec_id, str):
+        payload.pop("id", None)
+        # У карточки новой панели uuid лежит отдельным полем — приводим в "id".
+        if not payload.get("id") and rec.get("uuid"):
+            payload["id"] = rec["uuid"]
+    payload.pop("uuid", None)
+    payload.pop("createdAt", None)
+    payload.pop("updatedAt", None)
+
+    if "allowedIPs" in payload:
+        aips = payload.get("allowedIPs")
+        if isinstance(aips, str):
+            aips = aips.strip()
+            payload["allowedIPs"] = [aips] if aips else []
+        elif aips is None:
+            payload.pop("allowedIPs", None)
+
+    if "reverse" in payload:
+        rev = payload.get("reverse")
+        if isinstance(rev, str):
+            rev_s = rev.strip()
+            if not rev_s:
+                payload.pop("reverse", None)
+            else:
+                try:
+                    payload["reverse"] = json.loads(rev_s)
+                except (json.JSONDecodeError, ValueError):
+                    payload.pop("reverse", None)
+
+    # limitHwid не может быть None — иначе панель обнулила бы лимит молча.
+    if payload.get("limitHwid") is None:
+        payload["limitHwid"] = 0
+
+    for k, v in overrides.items():
+        payload[k] = v
+    return payload
+
+
+def _parse_inbound_ids(obj) -> list[int]:
+    if isinstance(obj, dict) and isinstance(obj.get("inboundIds"), list):
+        out = []
+        for i in obj["inboundIds"]:
+            try:
+                out.append(int(i))
+            except (TypeError, ValueError):
+                continue
+        return out
+    return []
+
+
+async def _post_client_update(email: str, payload: dict, inbound_ids: list[int]) -> None:
+    query = ""
+    if inbound_ids:
+        query = "?inboundIds=" + ",".join(str(i) for i in inbound_ids)
+    await _panel_call(
+        "POST", f"panel/api/clients/update/{quote(email, safe='')}{query}", payload
+    )
+
+
+async def _get_client_card(email: str) -> tuple[dict | None, list[int]]:
+    """Возвращает (карточку клиента, inbound'ы) из panel/api/clients/get/{email}."""
+    obj = await _panel_call("GET", f"panel/api/clients/get/{quote(email, safe='')}")
+    rec = None
+    inbound_ids: list[int] = []
+    if isinstance(obj, dict):
+        inner = obj.get("client")
+        rec = inner if isinstance(inner, dict) and inner else obj
+        inbound_ids = _parse_inbound_ids(obj)
+    return (rec if isinstance(rec, dict) and rec.get("email") else None, inbound_ids)
+
+
 async def update_vpn_user_expiry(client_ref: str, expiry_time_ms: int) -> None:
     """
     Обновляет срок действия клиента в 3x-ui.
@@ -423,30 +517,23 @@ async def update_vpn_user_expiry(client_ref: str, expiry_time_ms: int) -> None:
             logger.warning(f"[xui] update_expiry: клиент не найден {client_ref}")
             return
 
-        obj = await asyncio.wait_for(
-            _panel_call("GET", f"panel/api/clients/get/{quote(email, safe='')}"),
-            timeout=OP_TIMEOUT,
+        rec, inbound_ids = await asyncio.wait_for(
+            _get_client_card(email), timeout=OP_TIMEOUT
         )
-
-        client = None
-        if isinstance(obj, dict):
-            inner = obj.get("client")
-            client = inner if isinstance(inner, dict) else obj
-
-        if not isinstance(client, dict):
-            logger.warning(f"[xui] update_expiry: пустой ответ панели для {email}")
+        if not rec:
+            logger.warning(f"[xui] update_expiry: пустая карточка клиента {email}")
             return
 
         # Меняем только срок и enable, остальное отправляем как есть
-        client["expiryTime"] = int(expiry_time_ms)
-        client["enable"] = True
+        payload = _build_client_update_payload(
+            rec, {"expiryTime": int(expiry_time_ms), "enable": True}
+        )
+        if not payload:
+            logger.warning(f"[xui] update_expiry: не удалось собрать payload для {email}")
+            return
 
         await asyncio.wait_for(
-            _panel_call(
-                "POST",
-                f"panel/api/clients/update/{quote(email, safe='')}",
-                client,
-            ),
+            _post_client_update(email, payload, inbound_ids),
             timeout=OP_TIMEOUT,
         )
         logger.info(f"[xui] expiry updated: {email} -> {expiry_time_ms}")
@@ -472,6 +559,43 @@ async def close_panel_session() -> None:
 # 🔍 Информация о клиентах
 # ──────────────────────────────────────────────────────────────
 
+def _extract_ip_from_entry(item) -> str | None:
+    """
+    Одна запись IP-журнала панели → чистая строка IP или None.
+
+    Новая панель хранит записи объектами {"ip": "1.2.3.4", "timestamp": 1234567890};
+    они же могут прийти строкой с JSON внутри, а старые версии панели —
+    строкой "1.2.3.4 2026-01-01 12:00". Всё, что не парсится в реальный
+    IP, отбрасываем — иначе мусор (например repr словаря) попадал в UI
+    и в DELETE-запросы как «неизвестное устройство {'ip': ...».
+    """
+    if isinstance(item, dict):
+        item = item.get("ip")
+    if not isinstance(item, str):
+        return None
+
+    s = item.strip()
+    if not s:
+        return None
+
+    if s.startswith("{"):
+        try:
+            parsed = json.loads(s)
+        except (json.JSONDecodeError, ValueError):
+            parsed = None
+        if isinstance(parsed, dict):
+            return _extract_ip_from_entry(parsed)
+
+    candidate = s.split(" ")[0].strip().strip("[]")
+    if not candidate:
+        return None
+    try:
+        ipaddress.ip_address(candidate)
+    except ValueError:
+        return None
+    return candidate
+
+
 def _parse_ip_records(raw) -> set[str]:
     ips: set[str] = set()
     if not raw or raw == "No IP Record":
@@ -479,16 +603,21 @@ def _parse_ip_records(raw) -> set[str]:
 
     records = raw
     if isinstance(raw, str):
+        s = raw.strip()
         try:
-            records = json.loads(raw)
-        except json.JSONDecodeError:
-            records = raw.splitlines()
+            records = json.loads(s)
+        except (json.JSONDecodeError, ValueError):
+            records = s.splitlines()
+
+    # одиночная запись-объект или одна строка
+    if isinstance(records, (dict, str)):
+        records = [records]
 
     if not isinstance(records, (list, tuple, set)):
         return ips
 
-    for line in records:
-        ip = str(line).split(" ")[0].strip()
+    for item in records:
+        ip = _extract_ip_from_entry(item)
         if ip:
             ips.add(ip)
     return ips
@@ -568,6 +697,56 @@ async def clear_client_ips(email: str) -> bool:
         return True
     except Exception as e:
         logger.warning(f"[xui] clear_client_ips failed for {email}: {e}")
+        return False
+
+
+async def revoke_client_configs(email: str, hwid_slots: int | None = None) -> bool:
+    """
+    Полный «выброс» чужих устройств из ключа — сделать так, чтобы удалённое
+    устройство не осталось подключённым и НИКОГДА не смогло вернуться:
+
+    1. Клиенту выдаётся новый UUID. Все конфиги, выданные раньше, сразу
+       становятся мёртвыми: активное соединение устройства рвётся на лету,
+       а переподключиться по скопированной ссылке/конфигу уже нельзя.
+    2. Опционально фиксируется лимит HWID = числу оставшихся устройств.
+       Подписку после этого сможет скачать только зарегистрированное в
+       панели устройство — удалённому сервер ответит отказом.
+
+    Все остальные настройки ключа (срок, лимиты, tgId и т.д.) сохраняются —
+    payload собирается round-trip из карточки клиента. Владельца ключа это
+    затрагивает одним переподключением: его приложение докачает свежий
+    конфиг по подписке автоматически (устройство владельца зарегистрировано).
+
+    Возвращает True, если панель применила обновление.
+    """
+    email = (email or "").strip()
+    if not email:
+        return False
+
+    try:
+        rec, inbound_ids = await _get_client_card(email)
+        if not rec:
+            logger.warning(f"[xui] revoke: пустая карточка клиента {email}")
+            return False
+
+        overrides: dict = {"id": str(uuid.uuid4())}
+        if hwid_slots is not None:
+            overrides["limitHwid"] = max(0, int(hwid_slots))
+
+        payload = _build_client_update_payload(rec, overrides)
+        if not payload:
+            logger.warning(f"[xui] revoke: не удалось собрать payload для {email}")
+            return False
+
+        await _post_client_update(email, payload, inbound_ids)
+        logger.info(
+            f"[xui] ключ «{email}» сброшен: новый UUID"
+            + (f", лимит HWID = {payload['limitHwid']}" if hwid_slots is not None else "")
+        )
+        return True
+
+    except Exception as e:
+        logger.warning(f"[xui] revoke_client_configs failed for {email}: {e}")
         return False
 
 

@@ -1122,7 +1122,8 @@ async def get_tariff_stats() -> list:
     db = await get_db()
     async with db.execute("""
         SELECT tariff, COUNT(*) as cnt FROM keys
-        WHERE tariff NOT LIKE '%Подарок%' AND tariff NOT LIKE '%Бонус%'
+        WHERE is_active = 1
+        AND tariff NOT LIKE '%Подарок%' AND tariff NOT LIKE '%Бонус%'
         AND tariff NOT LIKE '%Реф%' AND tariff NOT LIKE '%Пробный%'
         GROUP BY tariff ORDER BY cnt DESC LIMIT 5
     """) as c:

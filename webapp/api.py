@@ -353,17 +353,36 @@ async def api_key_delete_device(key_id: int, device_id: int, user_id: int = Depe
     _check_own_active_key(key, user_id)
     email = await _resolve_key_panel_email(key)
 
-    from xui_api import delete_client_device, clear_client_ips
+    from xui_api import delete_client_device, clear_client_ips, get_client_devices, revoke_client_configs
 
     ok = await delete_client_device(email, device_id)
     if not ok:
-        raise HTTPException(502, "Не удалось отключить устройство. Попробуйте ещё раз")
+        # Повторное нажатие после частично выполненного удаления:
+        # если устройства уже нет в журнале — считаем удаление состоявшимся
+        # и доигрываем остальные шаги.
+        current = await get_client_devices(email)
+        if any(isinstance(d, dict) and d.get("id") == device_id for d in current):
+            raise HTTPException(502, "Не удалось отключить устройство. Попробуйте ещё раз")
 
     # ВАЖНО: вместе с HWID-записью убираем и IP-записи клиента,
     # иначе устройство останется висеть «безымянным» IP-подключением
     # и фактически не отключится от VPN.
     if not await clear_client_ips(email):
         logger.warning(f"[devices] HWID {device_id} удалён, но IP-записи {email} очистить не удалось")
+
+    # ЖЁСТКИЙ ВЫБРОС: новый UUID моментально рвёт подключения по старым
+    # конфигам (устройство вылетает из сети, даже если сидит в VPN прямо
+    # сейчас), а лимит HWID = числу оставшихся устройств не даёт удалённому
+    # устройству ещё раз скачать конфиг по подписке — назад дороги нет.
+    remaining = await get_client_devices(email)
+    slots = max(1, len(remaining))
+    if not await revoke_client_configs(email, hwid_slots=slots):
+        logger.error(f"[devices] HWID {device_id} удалён, но сброс доступа не удался: {email}")
+        raise HTTPException(
+            502,
+            "Устройство отключено, но не получилось оборвать его соединение. "
+            "Нажмите «Отключить» ещё раз",
+        )
     return {"ok": True}
 
 
@@ -376,11 +395,23 @@ async def api_key_delete_ip_device(key_id: int, ip: str, user_id: int = Depends(
     _check_own_active_key(key, user_id)
     email = await _resolve_key_panel_email(key)
 
-    from xui_api import clear_client_ips
+    from xui_api import clear_client_ips, revoke_client_configs
 
     ok = await clear_client_ips(email)
     if not ok:
         raise HTTPException(502, "Не удалось отключить устройство. Попробуйте ещё раз")
+
+    # Рвём активное соединение: новый UUID — и все ранее выданные конфиги
+    # этого ключа мертвы. Лимит HWID здесь не трогаем: у устройств без
+    # HWID-идентификатора включение HWID-проверки заблокировало бы и
+    # владельца ключа.
+    if not await revoke_client_configs(email):
+        logger.error(f"[devices] IP-лог {email} очищен, но сброс доступа не удался")
+        raise HTTPException(
+            502,
+            "Подключения сброшены, но не получилось оборвать активное соединение. "
+            "Нажмите «Отключить» ещё раз",
+        )
     return {"ok": True}
 
 
