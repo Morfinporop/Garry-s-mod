@@ -112,7 +112,7 @@
 
       <div class="section" id="profile-devices-section" style="display:none;">
         <div class="section-header"><span class="section-title">Подключённые устройства</span></div>
-        <div class="devices-hint">Здесь видно, какие устройства пользуются вашим ключом. Если заметили чужое — отключите его, и оно навсегда потеряет доступ к вашему VPN.</div>
+        <div class="devices-hint">Здесь видно, какие устройства пользуются вашим ключом — сколько и когда они были в сети.</div>
         <div id="profile-devices"></div>
       </div>
     </section>
@@ -1627,14 +1627,11 @@ function devicesGroupHtml(key, data, failed) {
       if (base) subParts.push(base);
       subParts.push(online ? "сейчас в сети" : (seen ? `активно ${seen}` : "подключался ранее"));
       return `
-        <div class="device-row device-enter" style="animation-delay:${Math.min(i * 50, 250)}ms" data-keyid="${key.id}" ${d.id != null ? `data-devid="${d.id}"` : ""} ${d.ip ? `data-ip="${esc(d.ip)}"` : ""}>
+        <div class="device-row device-enter" style="animation-delay:${Math.min(i * 50, 250)}ms">
           <div class="device-icon">${deviceIconSvg(deviceKind(d))}</div>
           <div class="device-info">
             <div class="device-name">${esc(deviceName(d))}</div>
             <div class="device-sub">${online ? '<span class="device-online-dot"></span>' : ""}${esc(subParts.join(" · "))}</div>
-          </div>
-          <div class="device-delete-btn" title="Отключить от VPN">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
           </div>
         </div>`;
     }).join("");
@@ -1653,35 +1650,9 @@ function devicesGroupHtml(key, data, failed) {
 }
 
 function wireDeviceRows(box) {
+  // Устройства показываем, но не удаляем — список только для просмотра.
   box.querySelectorAll("[data-devices-retry]").forEach(el => {
     el.onclick = () => loadProfileDevices(lastProfileKeys);
-  });
-  box.querySelectorAll(".device-row").forEach(row => {
-    const btn = row.querySelector(".device-delete-btn");
-    if (!btn) return;
-    btn.onclick = (e) => {
-      e.stopPropagation();
-      const nameEl = row.querySelector(".device-name");
-      const name = nameEl ? nameEl.textContent : "устройство";
-      tg.showConfirm(`Отключить «${name}» от вашего VPN?\n\nЕго моментально выбросит из сети (даже если оно сейчас подключено) и вернуться оно больше не сможет. Ваше приложение может на мгновение переподключиться — это нормально.`, async (ok) => {
-        if (!ok) return;
-        row.classList.add("removing");
-        try {
-          const keyId = row.dataset.keyid;
-          if (row.dataset.devid) {
-            await api(`/api/keys/${keyId}/devices/${row.dataset.devid}`, { method: "DELETE" });
-          } else {
-            await api(`/api/keys/${keyId}/ip-devices/${encodeURIComponent(row.dataset.ip || "")}`, { method: "DELETE" });
-          }
-          haptic('notification', 'success');
-          setTimeout(() => loadProfileDevices(lastProfileKeys), 300);
-        } catch (err) {
-          row.classList.remove("removing");
-          haptic('notification', 'error');
-          tg.showAlert(err.message);
-        }
-      });
-    };
   });
 }
 
