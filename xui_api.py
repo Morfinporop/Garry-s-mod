@@ -860,6 +860,45 @@ async def check_suspicious_activity() -> int:
 
 
 # ──────────────────────────────────────────────────────────────
+# 🧼 Имя подключения в приложениях: чистый шаблон панели
+# ──────────────────────────────────────────────────────────────
+
+# Панель из коробки называет конфиги в приложении как
+# «Локация-tg7745681987-1gb|📊∞|⏳30D». Хвост с днями/трафиком лишний —
+# во всех приложениях остаётся строго tg{id}-Ngb и ничего больше.
+REMARK_TEMPLATE_CLEAN = "{{EMAIL}}"
+
+
+async def sync_remark_template() -> bool:
+    """
+    Приводит глобальный шаблон имени подключения в панели
+    (setting remarkTemplate) к чистому виду {{EMAIL}} — чтобы в
+    приложении было ровно tg{id}-Ngb, без «|30D» и прочих добавок.
+    Идемпотентно: если шаблон уже {{EMAIL}}, ничего не делает;
+    на старых панелях без такой настройки — пропускает.
+    Карточки настроек шлём round-trip: пустые значения секретов
+    панель трактует как «не менять», остальное не трогаем.
+    """
+    try:
+        obj = await _panel_call("POST", "panel/api/setting/all", {})
+        if not isinstance(obj, dict) or "remarkTemplate" not in obj:
+            logger.info("[xui] remarkTemplate: настройки панели без шаблона имени — пропуск")
+            return False
+
+        current = str(obj.get("remarkTemplate") or "")
+        if current == REMARK_TEMPLATE_CLEAN:
+            return True  # уже чистый — панель не трогаем
+
+        obj["remarkTemplate"] = REMARK_TEMPLATE_CLEAN
+        await _panel_call("POST", "panel/api/setting/update", obj)
+        logger.info(f"[xui] шаблон имени подключения почищен: «{current}» → «{REMARK_TEMPLATE_CLEAN}»")
+        return True
+    except Exception as e:
+        logger.warning(f"[xui] sync_remark_template не удался (некритично): {e}")
+        return False
+
+
+# ──────────────────────────────────────────────────────────────
 # 🚀 Проверка при старте: логируем локации и шаблон подписки
 # ──────────────────────────────────────────────────────────────
 
@@ -878,5 +917,7 @@ async def warmup_and_log_panel() -> None:
             )
         except Exception as e:
             logger.error(f"[xui] ⚠️ Не настроена ссылка подписки: {e}")
+
+        await sync_remark_template()
     except Exception as e:
         logger.warning(f"[xui] ⚠️ Панель 3x-ui недоступна при старте: {e}")
