@@ -297,13 +297,17 @@ async def create_vpn_user(
 
     Ссылка подписки содержит ключи всех локаций — юзер вставляет
     её в VPN-клиент (Happ / INCY / v2rayN и т.д.) и видит оба сервера.
+
+    Имя клиента короткое и читаемое: tg{telegram_id}-1gb. У одного
+    пользователя может быть несколько ключей, а имя в панели должно
+    быть уникальным — поэтому второй ключ получает tg{telegram_id}-2gb,
+    третий -3gb (панель отвечает Duplicate email — перебираем номер).
     """
     if hours <= 0:
         raise ValueError("hours must be > 0")
 
     client_uuid = str(uuid.uuid4())
     sub_id = _generate_sub_id()
-    email = f"tg{telegram_id}_{int(time.time() * 1000)}"
     expiry_ms = int((time.time() + hours * 3600) * 1000)
 
     try:
@@ -313,26 +317,37 @@ async def create_vpn_user(
         if not inbound_ids:
             raise RuntimeError("В панели 3x-ui не найдено ни одной локации (inbound)")
 
-        payload = {
-            "client": {
-                "email": email,
-                "id": client_uuid,
-                "subId": sub_id,
-                "expiryTime": expiry_ms,
-                "tgId": int(telegram_id),
-                "limitIp": 0,
-                "totalGB": 0,
-                "enable": True,
-                "comment": (key_label or "")[:100],
-            },
-            # 👇 обе локации одним запросом — как галочки в панели
-            "inboundIds": list(inbound_ids),
-        }
-
-        await asyncio.wait_for(
-            _panel_call("POST", "panel/api/clients/add", payload),
-            timeout=OP_TIMEOUT,
-        )
+        email = ""
+        for attempt in range(1, 10):
+            email = f"tg{telegram_id}-{attempt}gb"
+            payload = {
+                "client": {
+                    "email": email,
+                    "id": client_uuid,
+                    "subId": sub_id,
+                    "expiryTime": expiry_ms,
+                    "tgId": int(telegram_id),
+                    "limitIp": 0,
+                    "totalGB": 0,
+                    "enable": True,
+                    "comment": (key_label or "")[:100],
+                },
+                # 👇 обе локации одним запросом — как галочки в панели
+                "inboundIds": list(inbound_ids),
+            }
+            try:
+                await asyncio.wait_for(
+                    _panel_call("POST", "panel/api/clients/add", payload),
+                    timeout=OP_TIMEOUT,
+                )
+                break
+            except RuntimeError as e:
+                low = str(e).lower()
+                if "duplicate" in low or "уже существует" in low or "already exists" in low:
+                    continue  # имя занято — берём следующий номер
+                raise
+        else:
+            raise RuntimeError("Не удалось подобрать свободное имя ключа в панели")
 
     except asyncio.TimeoutError:
         _invalidate_session()
