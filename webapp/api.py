@@ -28,6 +28,7 @@ from database.db import (
     get_tariff_stats, get_funnel_stats, get_all_users, search_users,
     user_exists, get_user_active_keys_with_id,
     get_key_by_id, deactivate_key, set_user_auto_renew_all,
+    update_key_proxy_address,
     get_user_purchase_summary, ban_user, unban_user,
     create_promo, get_all_promos, delete_promo, get_promo,
     add_promo_post, get_promo_posts,
@@ -296,14 +297,26 @@ async def _resolve_key_panel_email(key) -> str:
     from xui_api import _resolve_client_email
 
     ref = (key["proxy_address"] or "").strip()
-    if not ref:
+    sub_link = (key["key_value"] or "").strip()
+    if not ref and not sub_link:
         raise HTTPException(404, "Ключ не привязан к VPN-серверу")
     try:
-        email = await asyncio.wait_for(_resolve_client_email(ref), timeout=20)
+        email = await asyncio.wait_for(
+            _resolve_client_email(ref, sub_link), timeout=20
+        )
     except Exception:
         email = None
     if not email:
         raise HTTPException(503, "VPN-сервер временно не отвечает, попробуйте позже")
+
+    if email != ref:
+        # Клиента переименовали в панели — нашли его по ссылке подписки.
+        # Самолечение: запоминаем новое имя, чтобы дальше не искать заново.
+        try:
+            await update_key_proxy_address(key["id"], email)
+            logger.info(f"[keys] ключ #{key['id']} переименован в панели: {ref} -> {email}")
+        except Exception:
+            logger.exception(f"[keys] не удалось обновить proxy_address ключа #{key['id']}")
     return email
 
 

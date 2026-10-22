@@ -671,12 +671,12 @@ async def deactivate_key(key_id: int) -> None:
     from xui_api import delete_vpn_user
 
     db = await get_db()
-    async with db.execute("SELECT proxy_address, user_id FROM keys WHERE id = ?", (key_id,)) as c:
+    async with db.execute("SELECT proxy_address, user_id, key_value FROM keys WHERE id = ?", (key_id,)) as c:
         row = await c.fetchone()
 
-    if row and row["proxy_address"]:
+    if row and (row["proxy_address"] or row["key_value"]):
         try:
-            await delete_vpn_user(row["proxy_address"])
+            await delete_vpn_user(row["proxy_address"], sub_link=row["key_value"])
         except Exception:
             logger.exception(f"deactivate_key: failed {row['proxy_address']}")
 
@@ -719,6 +719,24 @@ async def get_key_by_id(key_id: int):
         return await c.fetchone()
 
 
+async def update_key_proxy_address(key_id: int, proxy_address: str) -> None:
+    """
+    Клиента переименовали в панели 3x-ui (через веб-админку) — и бот
+    находил клиента по ссылке подписки. Запоминаем актуальное имя,
+    чтобы следующие операции не делали лишний поиск.
+    """
+    db = await get_db()
+    async with db.execute("SELECT user_id FROM keys WHERE id = ?", (key_id,)) as c:
+        row = await c.fetchone()
+    await db.execute(
+        "UPDATE keys SET proxy_address = ? WHERE id = ?",
+        (proxy_address, key_id),
+    )
+    await db.commit()
+    if row:
+        _cache_del(f"user_keys:{row['user_id']}")
+
+
 async def get_all_keys_count() -> int:
     db = await get_db()
     async with db.execute("SELECT COUNT(*) as cnt FROM keys WHERE is_active = 1") as c:
@@ -730,7 +748,7 @@ async def extend_key(key_id: int, days: int) -> str:
     from xui_api import update_vpn_user_expiry
 
     db = await get_db()
-    async with db.execute("SELECT expires_at, user_id, proxy_address FROM keys WHERE id = ?", (key_id,)) as c:
+    async with db.execute("SELECT expires_at, user_id, proxy_address, key_value FROM keys WHERE id = ?", (key_id,)) as c:
         row = await c.fetchone()
     if not row:
         raise ValueError("Key not found")
@@ -746,10 +764,12 @@ async def extend_key(key_id: int, days: int) -> str:
     new_exp = exp + timedelta(days=days)
     new_exp_str = new_exp.strftime("%Y-%m-%d %H:%M")
 
-    if row["proxy_address"]:
+    if row["proxy_address"] or row["key_value"]:
         try:
             expiry_ms = int(new_exp.timestamp() * 1000)
-            await update_vpn_user_expiry(row["proxy_address"], expiry_ms)
+            await update_vpn_user_expiry(
+                row["proxy_address"], expiry_ms, sub_link=row["key_value"]
+            )
         except Exception as e:
             logger.exception(f"extend_key: sync 3x-ui failed {row['proxy_address']}: {e}")
 

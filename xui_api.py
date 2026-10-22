@@ -357,37 +357,71 @@ _UUID_RE = re.compile(
 )
 
 
-async def _resolve_client_email(client_ref: str) -> str | None:
+def _extract_sub_id(sub_link: str) -> str | None:
+    """Достаёт subId из ссылки подписки вида https://host:port/sub/path/<subId>."""
+    link = (sub_link or "").strip()
+    if not link:
+        return None
+    # отрезаем query/fragment и возможный хвост вида /json или #remark
+    link = link.split("#", 1)[0].split("?", 1)[0].rstrip("/")
+    tail = link.rsplit("/", 1)[-1].strip()
+    return tail or None
+
+
+async def _resolve_client_email(client_ref: str, sub_link: str | None = None) -> str | None:
     """
-    client_ref — email (новые ключи) или UUID (старые записи в БД).
-    Для UUID ищем email через список клиентов панели.
+    Находит email клиента в панели.
+
+    client_ref — сохранённый в нашей БД адрес клиента (email для новых
+    ключей, UUID для старых записей). sub_link — ссылка подписки ключа.
+
+    Панель позволяет ПЕРЕИМЕНОВАТЬ клиента вручную — после такого
+    переименования сохранённый email перестаёт существовать, и бот
+    «терял» ключ (продление, устройства, удаление не находили клиента).
+    Поэтому, если клиента по сохранённому email нет, ищем его по subId
+    из ссылки подписки — он не меняется при переименовании.
     """
     ref = (client_ref or "").strip()
-    if not ref:
+    sub_id = _extract_sub_id(sub_link or "")
+
+    if not ref and not sub_id:
         return None
-    if not _UUID_RE.match(ref):
-        # это уже email (в 3x-ui email может быть без @)
+
+    if ref and not _UUID_RE.match(ref) and not sub_id:
+        # обычный email без ссылки подписки — верим сохранённому (дешёвый путь)
         return ref
 
     obj = await _panel_call("GET", "panel/api/clients/list")
+    fallback: str | None = None
     for item in obj or []:
         if not isinstance(item, dict):
             continue
-        if ref in (str(item.get("uuid") or ""), str(item.get("id") or "")):
-            email = item.get("email")
-            if email:
-                return str(email)
-    return None
+        email = str(item.get("email") or "")
+        if not email:
+            continue
+        # точное совпадение сохранённого email — клиент на месте
+        if ref and email == ref and not _UUID_RE.match(ref):
+            return ref
+        # старые записи: ref — это UUID клиента
+        if ref and _UUID_RE.match(ref) and ref in (
+            str(item.get("uuid") or ""), str(item.get("id") or ""),
+        ):
+            return email
+        # клиент переименован в панели — ищем по subId из ссылки подписки
+        if sub_id and str(item.get("subId") or "") == sub_id:
+            fallback = email
+            # не возвращаем сразу: вдруг ниже найдётся и точное совпадение
+    return fallback
 
 
-async def delete_vpn_user(client_ref: str) -> None:
+async def delete_vpn_user(client_ref: str, sub_link: str | None = None) -> None:
     """Удаляет клиента из панели (из всех подключённых inbound'ов сразу)."""
-    if not client_ref:
+    if not client_ref and not sub_link:
         return
 
     try:
         email = await asyncio.wait_for(
-            _resolve_client_email(client_ref), timeout=OP_TIMEOUT
+            _resolve_client_email(client_ref, sub_link), timeout=OP_TIMEOUT
         )
         if not email:
             logger.warning(f"[xui] delete skipped, client already absent: {client_ref}")
@@ -500,18 +534,20 @@ async def _get_client_card(email: str) -> tuple[dict | None, list[int]]:
     return (rec if isinstance(rec, dict) and rec.get("email") else None, inbound_ids)
 
 
-async def update_vpn_user_expiry(client_ref: str, expiry_time_ms: int) -> None:
+async def update_vpn_user_expiry(
+    client_ref: str, expiry_time_ms: int, sub_link: str | None = None
+) -> None:
     """
     Обновляет срок действия клиента в 3x-ui.
     Изменения применяются сразу во всех inbound'ах клиента
     (новый API панели сам рассылает это по всем локациям).
     """
-    if not client_ref:
+    if not client_ref and not sub_link:
         return
 
     try:
         email = await asyncio.wait_for(
-            _resolve_client_email(client_ref), timeout=OP_TIMEOUT
+            _resolve_client_email(client_ref, sub_link), timeout=OP_TIMEOUT
         )
         if not email:
             logger.warning(f"[xui] update_expiry: клиент не найден {client_ref}")
