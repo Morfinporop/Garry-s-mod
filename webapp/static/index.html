@@ -112,7 +112,7 @@
 
       <div class="section" id="profile-devices-section" style="display:none;">
         <div class="section-header"><span class="section-title">Подключённые устройства</span></div>
-        <div class="devices-hint">Здесь видно, какие устройства пользуются вашим ключом. Если заметили чужое — просто отключите его, и оно потеряет доступ к VPN.</div>
+        <div class="devices-hint">Здесь видно, какие устройства пользуются вашим ключом. Если заметили чужое — отключите его, и оно навсегда потеряет доступ к вашему VPN.</div>
         <div id="profile-devices"></div>
       </div>
     </section>
@@ -1663,7 +1663,7 @@ function wireDeviceRows(box) {
       e.stopPropagation();
       const nameEl = row.querySelector(".device-name");
       const name = nameEl ? nameEl.textContent : "устройство";
-      tg.showConfirm(`Отключить «${name}» от вашего VPN?\nУстройство больше не сможет пользоваться этим ключом.`, async (ok) => {
+      tg.showConfirm(`Отключить «${name}» от вашего VPN?\n\nЕго моментально выбросит из сети (даже если оно сейчас подключено) и вернуться оно больше не сможет. Ваше приложение может на мгновение переподключиться — это нормально.`, async (ok) => {
         if (!ok) return;
         row.classList.add("removing");
         try {
