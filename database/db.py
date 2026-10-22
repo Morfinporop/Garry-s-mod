@@ -706,7 +706,7 @@ async def get_user_active_keys(user_id: int) -> list:
 async def get_user_active_keys_with_id(user_id: int) -> list:
     db = await get_db()
     async with db.execute(
-        "SELECT id, key_value, tariff, created_at, expires_at, is_duo, max_users, key_source, price_paid, auto_renew "
+        "SELECT id, key_value, tariff, created_at, expires_at, is_duo, max_users, key_source, price_paid, auto_renew, proxy_address "
         "FROM keys WHERE user_id = ? AND is_active = 1 ORDER BY id DESC",
         (user_id,)
     ) as c:

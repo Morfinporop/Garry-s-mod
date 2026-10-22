@@ -2120,6 +2120,52 @@ function renderUsersListData(data, page, search) {
 
 let adminUserHistoryPage = 0;
 
+// Устройства ключа в карточке пользователя у админа — ТОЛЬКО ПРОСМОТР,
+// без кнопок отключения (отключать устройство может владелец ключа в профиле).
+function adminDevicesGroupHtml(key) {
+  const lockIcon = `<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>`;
+  const shieldIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>`;
+  const devs = key.devices;
+  let inner, countLabel;
+  if (!devs || devs.mode === "error") {
+    inner = `<div class="devices-empty">${shieldIcon}<span>Панель не ответила — список недоступен</span></div>`;
+    countLabel = `<span class="devices-count">? устройств</span>`;
+  } else if (!devs.devices.length) {
+    inner = `<div class="devices-empty">${shieldIcon}<span>Нет подключённых устройств</span></div>`;
+    countLabel = `<span class="devices-count">0 устройств</span>`;
+  } else {
+    const n = devs.devices.length;
+    countLabel = `<span class="devices-count has-devices">${n} ${pluralRu(n, "устройство", "устройства", "устройств")}</span>`;
+    inner = devs.devices.map(d => {
+      const seen = formatDeviceSeen(d.last_seen);
+      const online = seen === "online";
+      const subParts = [];
+      const base = deviceSubline(d);
+      if (base) subParts.push(base);
+      subParts.push(online ? "сейчас в сети" : (seen ? `активно ${seen}` : "подключался ранее"));
+      return `
+        <div class="device-row">
+          <div class="device-icon">${deviceIconSvg(deviceKind(d))}</div>
+          <div class="device-info">
+            <div class="device-name">${esc(deviceName(d))}</div>
+            <div class="device-sub">${online ? '<span class="device-online-dot"></span>' : ""}${esc(subParts.join(" · "))}</div>
+          </div>
+        </div>`;
+    }).join("");
+  }
+  return `
+    <div class="devices-card" style="margin-bottom:6px;">
+      <div class="devices-head">
+        <div class="devices-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${lockIcon}</svg>
+          <span>${esc(key.tariff)}</span>
+        </div>
+        ${countLabel}
+      </div>
+      ${inner}
+    </div>`;
+}
+
 async function adminRenderUser(c) {
   const uid = adminState.uid;
   c.innerHTML = adminHeader("Пользователь", "users") + skeletonBlock(140);
@@ -2169,6 +2215,11 @@ async function adminRenderUser(c) {
         <div class="admin-menu-btn" data-act="${u.is_banned ? "unban" : "ban"}">${aIcon(u.is_banned ? "shield" : "ban")}<span>${u.is_banned ? "Разбанить" : "Забанить"}</span></div>
       </div>
     `;
+
+    if (data.keys.length) {
+      html += `<div class="section-header" style="margin-top:16px;"><span class="section-title">Подключённые устройства</span></div>`;
+      data.keys.forEach(k => { html += adminDevicesGroupHtml(k); });
+    }
 
     html += `<div class="section-header" style="margin-top:16px;"><span class="section-title">История операций</span></div>`;
     html += `<div id="admin-user-history"></div>`;
