@@ -333,6 +333,21 @@ def _normalize_panel_device(d: dict) -> dict:
     }
 
 
+def _device_visual_key(d: dict) -> tuple:
+    """
+    «Визуальный» отпечаток устройства — то, что реально видно в списке:
+    название (модель или ОС+версия) и подпись под ним. Панель может хранить
+    несколько HWID-записей одного и того же телефона (переустановка
+    приложения и т.п.) — в интерфейсе это выглядело как два одинаковых
+    устройства, поэтому такие строки схлопываем в одну.
+    """
+    return (
+        (d.get("model") or "").strip().casefold(),
+        (d.get("os") or "").strip().casefold(),
+        (d.get("os_version") or "").strip().casefold(),
+    )
+
+
 async def _key_devices_payload(email: str) -> dict:
     """Список устройств клиента панели: сначала HWID-журнал, иначе IP-записи."""
     from xui_api import get_client_devices, get_client_ips
@@ -342,7 +357,19 @@ async def _key_devices_payload(email: str) -> dict:
     )
 
     devices = [_normalize_panel_device(d) for d in hwid_devices]
+    # Свежие подключения — сверху; при схлопывании дублей остаётся
+    # именно строка с самым поздним last_seen.
     devices.sort(key=lambda d: d.get("last_seen") or 0, reverse=True)
+    unique: list[dict] = []
+    seen_keys: set = set()
+    for d in devices:
+        k = _device_visual_key(d)
+        if k in seen_keys:
+            continue
+        seen_keys.add(k)
+        unique.append(d)
+    devices = unique
+
     if devices:
         return {"mode": "hwid", "devices": devices}
 
