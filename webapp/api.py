@@ -363,73 +363,14 @@ async def api_key_devices(key_id: int, user_id: int = Depends(get_current_user_i
 
 @app.delete("/api/keys/{key_id}/devices/{device_id}")
 async def api_key_delete_device(key_id: int, device_id: int, user_id: int = Depends(get_current_user_id)):
-    """Отключить конкретное устройство от ключа — оно теряет доступ к VPN."""
-    if not await is_feature_enabled("profile"):
-        raise HTTPException(403, "Раздел временно отключён")
-    key = await get_key_by_id(key_id)
-    _check_own_active_key(key, user_id)
-    email = await _resolve_key_panel_email(key)
-
-    from xui_api import delete_client_device, clear_client_ips, get_client_devices, revoke_client_configs
-
-    ok = await delete_client_device(email, device_id)
-    if not ok:
-        # Повторное нажатие после частично выполненного удаления:
-        # если устройства уже нет в журнале — считаем удаление состоявшимся
-        # и доигрываем остальные шаги.
-        current = await get_client_devices(email)
-        if any(isinstance(d, dict) and d.get("id") == device_id for d in current):
-            raise HTTPException(502, "Не удалось отключить устройство. Попробуйте ещё раз")
-
-    # ВАЖНО: вместе с HWID-записью убираем и IP-записи клиента,
-    # иначе устройство останется висеть «безымянным» IP-подключением
-    # и фактически не отключится от VPN.
-    if not await clear_client_ips(email):
-        logger.warning(f"[devices] HWID {device_id} удалён, но IP-записи {email} очистить не удалось")
-
-    # ЖЁСТКИЙ ВЫБРОС: новый UUID моментально рвёт подключения по старым
-    # конфигам (устройство вылетает из сети, даже если сидит в VPN прямо
-    # сейчас), а лимит HWID = числу оставшихся устройств не даёт удалённому
-    # устройству ещё раз скачать конфиг по подписке — назад дороги нет.
-    remaining = await get_client_devices(email)
-    slots = max(1, len(remaining))
-    if not await revoke_client_configs(email, hwid_slots=slots):
-        logger.error(f"[devices] HWID {device_id} удалён, но сброс доступа не удался: {email}")
-        raise HTTPException(
-            502,
-            "Устройство отключено, но не получилось оборвать его соединение. "
-            "Нажмите «Отключить» ещё раз",
-        )
-    return {"ok": True}
+    """Удаление устройств из профиля отключено — список только для просмотра."""
+    raise HTTPException(403, "Отключение устройств недоступно — список только для просмотра")
 
 
 @app.delete("/api/keys/{key_id}/ip-devices/{ip}")
 async def api_key_delete_ip_device(key_id: int, ip: str, user_id: int = Depends(get_current_user_id)):
-    """Сбросить IP-подключения ключа (для устройств без HWID-идентификатора)."""
-    if not await is_feature_enabled("profile"):
-        raise HTTPException(403, "Раздел временно отключён")
-    key = await get_key_by_id(key_id)
-    _check_own_active_key(key, user_id)
-    email = await _resolve_key_panel_email(key)
-
-    from xui_api import clear_client_ips, revoke_client_configs
-
-    ok = await clear_client_ips(email)
-    if not ok:
-        raise HTTPException(502, "Не удалось отключить устройство. Попробуйте ещё раз")
-
-    # Рвём активное соединение: новый UUID — и все ранее выданные конфиги
-    # этого ключа мертвы. Лимит HWID здесь не трогаем: у устройств без
-    # HWID-идентификатора включение HWID-проверки заблокировало бы и
-    # владельца ключа.
-    if not await revoke_client_configs(email):
-        logger.error(f"[devices] IP-лог {email} очищен, но сброс доступа не удался")
-        raise HTTPException(
-            502,
-            "Подключения сброшены, но не получилось оборвать активное соединение. "
-            "Нажмите «Отключить» ещё раз",
-        )
-    return {"ok": True}
+    """Удаление устройств из профиля отключено — список только для просмотра."""
+    raise HTTPException(403, "Отключение устройств недоступно — список только для просмотра")
 
 
 @app.get("/api/history")
