@@ -306,6 +306,15 @@ async def create_vpn_user(
     if hours <= 0:
         raise ValueError("hours must be > 0")
 
+    # 🇫🇮 При выдаче ключа: подписка должна СРАЗУ отдаваться с правильным
+    # именем «🇫🇮 Finland_id…» — синхронизируем флаги в remark inbound'ов
+    # и шаблон имени панели. Идемпотентно (дубли внутри 30 сек отсекаются),
+    # ошибки некритичны: выдача ключа из-за них не прерывается.
+    try:
+        await asyncio.wait_for(ensure_naming_ready(), timeout=XUI_TIMEOUT)
+    except Exception as e:
+        logger.warning(f"[xui] 🏳 имя конфига не синхронизировано (некритично): {e}")
+
     client_uuid = str(uuid.uuid4())
     sub_id = _generate_sub_id()
     expiry_ms = int((time.time() + hours * 3600) * 1000)
@@ -883,27 +892,34 @@ async def sync_remark_template() -> bool:
     в приложении отображается «🇫🇮 Finland_id7745681987»: флаг и
     название локации + id телеграма, без «|📊∞|⏳30D» и прочих добавок.
     Идемпотентно: если шаблон уже совпадает, ничего не делает;
-    на старых панелях без такой настройки — пропускает.
+    на старых панелях без такой настройки — пропускает (False).
     Карточки настроек шлём round-trip: пустые значения секретов
     панель трактует как «не менять», остальное не трогаем.
+    Транспортные ошибки (панель недоступна/упала) — исключение,
+    чтобы ensure_naming_ready знал: синхронизация не состоялась
+    и её нужно повторить при следующей выдаче.
     """
     try:
         obj = await _panel_call("POST", "panel/api/setting/all", {})
-        if not isinstance(obj, dict) or "remarkTemplate" not in obj:
-            logger.info("[xui] remarkTemplate: настройки панели без шаблона имени — пропуск")
-            return False
-
-        current = str(obj.get("remarkTemplate") or "")
-        if current == REMARK_TEMPLATE_CLEAN:
-            return True  # уже чистый — панель не трогаем
-
-        obj["remarkTemplate"] = REMARK_TEMPLATE_CLEAN
-        await _panel_call("POST", "panel/api/setting/update", obj)
-        logger.info(f"[xui] шаблон имени подключения почищен: «{current}» → «{REMARK_TEMPLATE_CLEAN}»")
-        return True
     except Exception as e:
-        logger.warning(f"[xui] sync_remark_template не удался (некритично): {e}")
+        logger.warning(f"[xui] sync_remark_template: настройки недоступны: {e}")
+        raise
+    if not isinstance(obj, dict) or "remarkTemplate" not in obj:
+        logger.info("[xui] remarkTemplate: настройки панели без шаблона имени — пропуск")
         return False
+
+    current = str(obj.get("remarkTemplate") or "")
+    if current == REMARK_TEMPLATE_CLEAN:
+        return True  # уже чистый — панель не трогаем
+
+    obj["remarkTemplate"] = REMARK_TEMPLATE_CLEAN
+    try:
+        await _panel_call("POST", "panel/api/setting/update", obj)
+    except Exception as e:
+        logger.warning(f"[xui] sync_remark_template: шаблон не применён: {e}")
+        raise
+    logger.info(f"[xui] шаблон имени подключения почищен: «{current}» → «{REMARK_TEMPLATE_CLEAN}»")
+    return True
 
 
 # ──────────────────────────────────────────────────────────────
@@ -971,13 +987,18 @@ async def sync_inbound_remarks() -> int:
     Проставляет флаги стран в remark inbound'ов панели (нужно, чтобы
     шаблон имени {{INBOUND}} показывал «🇫🇮 Finland», а не «Finland»).
     Идемпотентно: inbound'ы, чей remark уже готов, не перезаписывает.
-    Возвращает число изменённых inbound'ов. Ошибки некритичны.
+    Возвращает число изменённых inbound'ов.
+
+    Ошибки обновления отдельных inbound'ов некритичны (warning),
+    а недоступность списка — КИДАЕТ исключение, чтобы вызывающий
+    код (ensure_naming_ready) знал: панель легла, синхронизация
+    не состоялась и её надо повторить при следующей выдаче.
     """
     try:
         items = await _panel_call("GET", "panel/api/inbounds/list")
     except Exception as e:
         logger.warning(f"[xui] sync_inbound_remarks: список inbound'ов недоступен: {e}")
-        return 0
+        raise
     if not isinstance(items, list):
         return 0
 
@@ -1028,6 +1049,62 @@ async def sync_inbound_remarks() -> int:
 
 
 # ──────────────────────────────────────────────────────────────
+# 🏳 Гарантия имени при выдаче ключа
+# ──────────────────────────────────────────────────────────────
+
+# При массовой выдаче (несколько ключей подряд) панель дёргаем
+# не чаще раза в ENSURE_NAMING_TTL секунд — sync идемпотентен,
+# и в обычном состоянии это всего два лёгких чтения.
+ENSURE_NAMING_TTL = 30.0
+# -inf, а не 0.0: у свежеподнятого процесса time.monotonic() мал,
+# и метка 0.0 давала бы ложный «TTL ещё действует» до 30-й секунды.
+_ensure_naming_at = float("-inf")
+_ensure_naming_lock = asyncio.Lock()
+
+
+async def ensure_naming_ready(force: bool = False) -> None:
+    """
+    Гарантирует, что к моменту выдачи ключа панель отдаёт подписку
+    с правильным именем «🇫🇮 Finland_id7745681987»:
+      1) в remark inbound'ов вшиты флаги стран;
+      2) шаблон имени {{INBOUND}}_id{{TELEGRAM_ID}}.
+
+    Вызывается при КАЖДОЙ выдаче (create_vpn_user) — флаг нужен и
+    при первом ключе после перезапуска панели, и при добавлении
+    новой локации после старта бота. Идемпотентно: если всё уже
+    на месте — только чтения (список inbound'ов + настройки),
+    записей и рестартов нет. Ошибки некритичны и выдачу не рвут.
+    """
+    global _ensure_naming_at
+
+    if not XUI_HOST:
+        return
+    now = time.monotonic()
+    if not force and (now - _ensure_naming_at) < ENSURE_NAMING_TTL:
+        return
+
+    async with _ensure_naming_lock:
+        now = time.monotonic()
+        if not force and (now - _ensure_naming_at) < ENSURE_NAMING_TTL:
+            return
+        try:
+            changed = await sync_inbound_remarks()
+            template_ok = await sync_remark_template()
+        except Exception as e:
+            # Метку времени не двигаем — повторим при следующей выдаче.
+            logger.warning(f"[xui] 🏳 синхронизация имени не удалась (некритично): {e}")
+            return
+        if changed:
+            logger.info(f"[xui] 🏳 при выдаче: флаг добавлен в {changed} локаций")
+        if not template_ok:
+            logger.warning(
+                "[xui] 🏳 шаблон имени подключения не подтверждён — "
+                "в приложении имя может отображаться без «🇫🇮» (см. лог выше)"
+            )
+        _ensure_naming_at = time.monotonic()
+
+
+# ──────────────────────────────────────────────────────────────
 # 🚀 Проверка при старте: логируем локации и шаблон подписки
 # ──────────────────────────────────────────────────────────────
 
@@ -1047,10 +1124,9 @@ async def warmup_and_log_panel() -> None:
         except Exception as e:
             logger.error(f"[xui] ⚠️ Не настроена ссылка подписки: {e}")
 
-        # Сначала флаги в названиях локаций (remark inbound'ов),
-        # затем шаблон имени — чтобы в приложении сразу отображалось
-        # «🇫🇮 Finland_id…», а не «Finland_id…» без флага.
-        await sync_inbound_remarks()
-        await sync_remark_template()
+        # Флаги в названиях локаций (remark inbound'ов) + шаблон имени —
+        # force обходит TTL, чтобы ПЕРВАЯ выдача после перезапуска сразу
+        # была «🇫🇮 Finland_id…», а не «Finland_id…» без флага.
+        await ensure_naming_ready(force=True)
     except Exception as e:
         logger.warning(f"[xui] ⚠️ Панель 3x-ui недоступна при старте: {e}")
