@@ -38,10 +38,9 @@ from handlers.errors import set_notifier
 from config import (
     ADMIN_IDS, TARIFFS, MULTI_TARIFFS, INACTIVE_KEY_TTL_DAYS,
     WEBAPP_PORT, MINIAPP_URL, PAYMENT_LINK_TTL_MINUTES,
-    BOT_STATUS_ON_MESSAGE, BOT_STATUS_OFF_MESSAGE,
 )
 
-from xui_api import check_suspicious_activity
+from xui_api import check_suspicious_activity, warmup_and_log_panel
 from webapp import extra_store
 from webapp.api import app as webapp_app, set_bot_token, set_bot, set_bot_username
 
@@ -190,19 +189,6 @@ async def broadcast_loop(bot: Bot) -> None:
             continue
 
         await asyncio.sleep(BROADCAST_LOOP_INTERVAL)
-
-
-async def notify_all_telegram(bot: Bot, message: str) -> None:
-    try:
-        users = await get_all_users(include_banned=False)
-        for u in users:
-            try:
-                await bot.send_message(u["user_id"], message)
-                await asyncio.sleep(FLOOD_DELAY)
-            except Exception:
-                pass
-    except Exception:
-        logger.exception("notify_all_telegram error")
 
 
 async def expiry_checker(bot: Bot) -> None:
@@ -585,6 +571,13 @@ async def main() -> None:
         logger.exception("DB init failed")
         raise
 
+    # Проверка панели 3x-ui: логирует локации и шаблон ссылки подписки.
+    # Ошибки не фатальны — бот продолжает работать.
+    try:
+        await warmup_and_log_panel()
+    except Exception:
+        logger.exception("XUI panel warmup failed")
+
     dp.include_router(errors.router)
     dp.include_router(start.router)
     dp.include_router(admin.router)
@@ -602,8 +595,6 @@ async def main() -> None:
     asyncio.create_task(payment_checker(bot))
     asyncio.create_task(payment_cleanup_loop())
     asyncio.create_task(auto_renew_loop(bot))
-
-    asyncio.create_task(notify_all_telegram(bot, BOT_STATUS_ON_MESSAGE))
 
     uvicorn_config = uvicorn.Config(
         webapp_app,
@@ -642,10 +633,6 @@ async def main() -> None:
 
         if wait_stop in done:
             logger.info("Shutdown signal received")
-            try:
-                await notify_all_telegram(bot, BOT_STATUS_OFF_MESSAGE)
-            except Exception:
-                pass
             await dp.stop_polling()
             web_server.should_exit = True
 

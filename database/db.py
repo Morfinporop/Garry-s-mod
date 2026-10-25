@@ -615,7 +615,8 @@ async def create_key(
         if not admin_check and keys_count >= MAX_KEYS_PER_USER:
             raise ValueError(f"Лимит ключей ({MAX_KEYS_PER_USER}). Дождитесь истечения старых.")
 
-        vless_link, client_uuid = await create_vpn_user(user_id, total_hours, tariff)
+        # Ссылка подписки (содержит обе локации) + email клиента в панели
+        sub_link, client_ref = await create_vpn_user(user_id, total_hours, tariff)
 
         now = datetime.now()
         expires = now + timedelta(hours=total_hours)
@@ -627,7 +628,7 @@ async def create_key(
                 "(user_id, key_value, tariff, proxy_address, created_at, expires_at, is_duo, max_users, is_active, auto_renew, key_source, price_paid) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)",
                 (
-                    user_id, vless_link, tariff, client_uuid,
+                    user_id, sub_link, tariff, client_ref,
                     now.strftime("%Y-%m-%d %H:%M"),
                     expires.strftime("%Y-%m-%d %H:%M"),
                     1 if max_users >= 2 else 0,
@@ -640,13 +641,13 @@ async def create_key(
         except Exception:
             logger.exception("create_key: db error, rolling back vpn client")
             try:
-                await delete_vpn_user(client_uuid)
+                await delete_vpn_user(client_ref)
             except Exception:
-                logger.exception(f"create_key: failed to rollback {client_uuid}")
+                logger.exception(f"create_key: failed to rollback {client_ref}")
             raise
 
         _cache_del(f"user_keys:{user_id}")
-        return vless_link
+        return sub_link
 
 
 async def set_auto_renew(key_id: int, enabled: bool) -> None:
@@ -670,12 +671,12 @@ async def deactivate_key(key_id: int) -> None:
     from xui_api import delete_vpn_user
 
     db = await get_db()
-    async with db.execute("SELECT proxy_address, user_id FROM keys WHERE id = ?", (key_id,)) as c:
+    async with db.execute("SELECT proxy_address, user_id, key_value FROM keys WHERE id = ?", (key_id,)) as c:
         row = await c.fetchone()
 
-    if row and row["proxy_address"]:
+    if row and (row["proxy_address"] or row["key_value"]):
         try:
-            await delete_vpn_user(row["proxy_address"])
+            await delete_vpn_user(row["proxy_address"], sub_link=row["key_value"])
         except Exception:
             logger.exception(f"deactivate_key: failed {row['proxy_address']}")
 
@@ -705,7 +706,7 @@ async def get_user_active_keys(user_id: int) -> list:
 async def get_user_active_keys_with_id(user_id: int) -> list:
     db = await get_db()
     async with db.execute(
-        "SELECT id, key_value, tariff, created_at, expires_at, is_duo, max_users, key_source, price_paid, auto_renew "
+        "SELECT id, key_value, tariff, created_at, expires_at, is_duo, max_users, key_source, price_paid, auto_renew, proxy_address "
         "FROM keys WHERE user_id = ? AND is_active = 1 ORDER BY id DESC",
         (user_id,)
     ) as c:
@@ -716,6 +717,24 @@ async def get_key_by_id(key_id: int):
     db = await get_db()
     async with db.execute("SELECT * FROM keys WHERE id = ?", (key_id,)) as c:
         return await c.fetchone()
+
+
+async def update_key_proxy_address(key_id: int, proxy_address: str) -> None:
+    """
+    Клиента переименовали в панели 3x-ui (через веб-админку) — и бот
+    находил клиента по ссылке подписки. Запоминаем актуальное имя,
+    чтобы следующие операции не делали лишний поиск.
+    """
+    db = await get_db()
+    async with db.execute("SELECT user_id FROM keys WHERE id = ?", (key_id,)) as c:
+        row = await c.fetchone()
+    await db.execute(
+        "UPDATE keys SET proxy_address = ? WHERE id = ?",
+        (proxy_address, key_id),
+    )
+    await db.commit()
+    if row:
+        _cache_del(f"user_keys:{row['user_id']}")
 
 
 async def get_all_keys_count() -> int:
@@ -729,7 +748,7 @@ async def extend_key(key_id: int, days: int) -> str:
     from xui_api import update_vpn_user_expiry
 
     db = await get_db()
-    async with db.execute("SELECT expires_at, user_id, proxy_address FROM keys WHERE id = ?", (key_id,)) as c:
+    async with db.execute("SELECT expires_at, user_id, proxy_address, key_value FROM keys WHERE id = ?", (key_id,)) as c:
         row = await c.fetchone()
     if not row:
         raise ValueError("Key not found")
@@ -745,10 +764,12 @@ async def extend_key(key_id: int, days: int) -> str:
     new_exp = exp + timedelta(days=days)
     new_exp_str = new_exp.strftime("%Y-%m-%d %H:%M")
 
-    if row["proxy_address"]:
+    if row["proxy_address"] or row["key_value"]:
         try:
             expiry_ms = int(new_exp.timestamp() * 1000)
-            await update_vpn_user_expiry(row["proxy_address"], expiry_ms)
+            await update_vpn_user_expiry(
+                row["proxy_address"], expiry_ms, sub_link=row["key_value"]
+            )
         except Exception as e:
             logger.exception(f"extend_key: sync 3x-ui failed {row['proxy_address']}: {e}")
 
@@ -1121,7 +1142,8 @@ async def get_tariff_stats() -> list:
     db = await get_db()
     async with db.execute("""
         SELECT tariff, COUNT(*) as cnt FROM keys
-        WHERE tariff NOT LIKE '%Подарок%' AND tariff NOT LIKE '%Бонус%'
+        WHERE is_active = 1
+        AND tariff NOT LIKE '%Подарок%' AND tariff NOT LIKE '%Бонус%'
         AND tariff NOT LIKE '%Реф%' AND tariff NOT LIKE '%Пробный%'
         GROUP BY tariff ORDER BY cnt DESC LIMIT 5
     """) as c:

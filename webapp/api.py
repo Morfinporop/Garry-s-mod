@@ -28,6 +28,7 @@ from database.db import (
     get_tariff_stats, get_funnel_stats, get_all_users, search_users,
     user_exists, get_user_active_keys_with_id,
     get_key_by_id, deactivate_key, set_user_auto_renew_all,
+    update_key_proxy_address,
     get_user_purchase_summary, ban_user, unban_user,
     create_promo, get_all_promos, delete_promo, get_promo,
     add_promo_post, get_promo_posts,
@@ -281,6 +282,124 @@ async def api_delete_key(key_id: int, user_id: int = Depends(get_current_user_id
     return {"refund": refund, "balance": balance}
 
 
+# ──────────────────────────────────────────────────────────────
+# 📱 Подключённые устройства ключа (кто пользуется вашим VPN)
+# ──────────────────────────────────────────────────────────────
+
+def _check_own_active_key(key, user_id: int):
+    if not key or key["user_id"] != user_id:
+        raise HTTPException(404, "Ключ не найден")
+    if not key["is_active"]:
+        raise HTTPException(400, "Ключ неактивен")
+
+
+async def _resolve_key_panel_email(key) -> str:
+    from xui_api import _resolve_client_email
+
+    ref = (key["proxy_address"] or "").strip()
+    sub_link = (key["key_value"] or "").strip()
+    if not ref and not sub_link:
+        raise HTTPException(404, "Ключ не привязан к VPN-серверу")
+    try:
+        email = await asyncio.wait_for(
+            _resolve_client_email(ref, sub_link), timeout=20
+        )
+    except Exception:
+        email = None
+    if not email:
+        raise HTTPException(503, "VPN-сервер временно не отвечает, попробуйте позже")
+
+    if email != ref:
+        # Клиента переименовали в панели — нашли его по ссылке подписки.
+        # Самолечение: запоминаем новое имя, чтобы дальше не искать заново.
+        try:
+            await update_key_proxy_address(key["id"], email)
+            logger.info(f"[keys] ключ #{key['id']} переименован в панели: {ref} -> {email}")
+        except Exception:
+            logger.exception(f"[keys] не удалось обновить proxy_address ключа #{key['id']}")
+    return email
+
+
+def _normalize_panel_device(d: dict) -> dict:
+    return {
+        "id": d.get("id"),
+        "kind": "device",
+        "model": str(d.get("deviceModel") or "")[:80],
+        "os": str(d.get("deviceOs") or "")[:40],
+        "os_version": str(d.get("osVersion") or "")[:40],
+        "user_agent": str(d.get("userAgent") or "")[:160],
+        "first_seen": d.get("firstSeen") or 0,
+        "last_seen": d.get("lastSeen") or 0,
+    }
+
+
+def _device_visual_key(d: dict) -> tuple:
+    """
+    «Визуальный» отпечаток устройства — то, что реально видно в списке:
+    название (модель или ОС+версия) и подпись под ним. Панель может хранить
+    несколько HWID-записей одного и того же телефона (переустановка
+    приложения и т.п.) — в интерфейсе это выглядело как два одинаковых
+    устройства, поэтому такие строки схлопываем в одну.
+    """
+    return (
+        (d.get("model") or "").strip().casefold(),
+        (d.get("os") or "").strip().casefold(),
+        (d.get("os_version") or "").strip().casefold(),
+    )
+
+
+async def _key_devices_payload(email: str) -> dict:
+    """Список устройств клиента панели: сначала HWID-журнал, иначе IP-записи."""
+    from xui_api import get_client_devices, get_client_ips
+
+    hwid_devices, ips = await asyncio.gather(
+        get_client_devices(email), get_client_ips(email)
+    )
+
+    devices = [_normalize_panel_device(d) for d in hwid_devices]
+    # Свежие подключения — сверху; при схлопывании дублей остаётся
+    # именно строка с самым поздним last_seen.
+    devices.sort(key=lambda d: d.get("last_seen") or 0, reverse=True)
+    unique: list[dict] = []
+    seen_keys: set = set()
+    for d in devices:
+        k = _device_visual_key(d)
+        if k in seen_keys:
+            continue
+        seen_keys.add(k)
+        unique.append(d)
+    devices = unique
+
+    if devices:
+        return {"mode": "hwid", "devices": devices}
+
+    ip_devices = [{"id": None, "kind": "ip", "ip": ip} for ip in sorted(ips)]
+    return {"mode": "ip" if ip_devices else "none", "devices": ip_devices}
+
+
+@app.get("/api/keys/{key_id}/devices")
+async def api_key_devices(key_id: int, user_id: int = Depends(get_current_user_id)):
+    """Список устройств, которые подключались к конкретному ключу пользователя."""
+    if not await is_feature_enabled("profile"):
+        raise HTTPException(403, "Раздел временно отключён")
+    key = await get_key_by_id(key_id)
+    _check_own_active_key(key, user_id)
+    email = await _resolve_key_panel_email(key)
+    return await _key_devices_payload(email)
+
+
+@app.delete("/api/keys/{key_id}/devices/{device_id}")
+async def api_key_delete_device(key_id: int, device_id: int, user_id: int = Depends(get_current_user_id)):
+    """Удаление устройств из профиля отключено — список только для просмотра."""
+    raise HTTPException(403, "Отключение устройств недоступно — список только для просмотра")
+
+
+@app.delete("/api/keys/{key_id}/ip-devices/{ip}")
+async def api_key_delete_ip_device(key_id: int, ip: str, user_id: int = Depends(get_current_user_id)):
+    """Удаление устройств из профиля отключено — список только для просмотра."""
+    raise HTTPException(403, "Отключение устройств недоступно — список только для просмотра")
+
+
 @app.get("/api/history")
 async def api_history(page: int = 0, user_id: int = Depends(get_current_user_id)):
     if not await is_feature_enabled("profile"):
@@ -420,7 +539,7 @@ async def api_tariffs(user_id: int = Depends(get_current_user_id)):
         price = t["price"]
         if discount_pct:
             price = int(price * (100 - discount_pct) / 100)
-        multi.append({"key": key, "title": t["title"], "price": price, "original_price": t["price"] if discount_pct else None, "days": t["days"], "max_users": t["max_users"], "savings": t.get("savings")})
+        multi.append({"key": key, "title": t["title"], "name": t["name"], "price": price, "original_price": t["price"] if discount_pct else None, "days": t["days"], "max_users": t["max_users"], "savings": t.get("savings")})
 
     return {
         "tariffs": tariffs, "multi": multi, "show_trial": not trial_used,
@@ -863,6 +982,33 @@ def _user_list_item(u) -> dict:
     }
 
 
+async def _admin_key_devices(key) -> dict:
+    """
+    Устройства ключа для карточки админки (только просмотр).
+    При недоступности панели возвращает mode=error, чтобы не ломать карточку.
+    """
+    from xui_api import _resolve_client_email
+
+    ref = (key["proxy_address"] or "").strip()
+    sub_link = (key["key_value"] or "").strip()
+    try:
+        email = await asyncio.wait_for(
+            _resolve_client_email(ref, sub_link), timeout=15
+        )
+        if not email:
+            return {"mode": "none", "devices": []}
+        if email != ref:
+            # переименован в панели — самовосстановление, как в профиле
+            try:
+                await update_key_proxy_address(key["id"], email)
+            except Exception:
+                pass
+        return await asyncio.wait_for(_key_devices_payload(email), timeout=20)
+    except Exception as e:
+        logger.debug(f"[admin] devices for key #{key['id']} failed: {e}")
+        return {"mode": "error", "devices": []}
+
+
 @app.get("/api/admin/users/{uid}")
 async def admin_user_card(uid: int, _: int = Depends(get_admin_user_id)):
     user = await get_user(uid)
@@ -873,7 +1019,11 @@ async def admin_user_card(uid: int, _: int = Depends(get_admin_user_id)):
     summary = await get_user_purchase_summary(uid)
     txs = await get_user_transactions(uid, limit=5, offset=0)
 
-    auto_renew = any(bool(k.get("auto_renew")) for k in keys)
+    auto_renew = any(bool(k["auto_renew"]) for k in keys)
+
+    # Устройства по каждому ключу — чтобы админ видел, сколько и чьих
+    # подключений на аккаунте. Просмотр без удаления.
+    devices_results = await asyncio.gather(*(_admin_key_devices(k) for k in keys))
 
     return {
         "user": {
@@ -886,8 +1036,9 @@ async def admin_user_card(uid: int, _: int = Depends(get_admin_user_id)):
                 "id": k["id"], "tariff": k["tariff"], "expires_at": k["expires_at"],
                 "max_users": k["max_users"], "is_duo": bool(k["is_duo"]),
                 "key_value": k["key_value"], "key_source": k["key_source"] or "purchased",
+                "devices": d,
             }
-            for k in keys
+            for k, d in zip(keys, devices_results)
         ],
         "purchase_summary": {"count": summary["count"], "spent": summary["spent"]},
         "transactions": [{"amount": t["amount"], "description": t["description"], "created_at": t["created_at"]} for t in txs],
@@ -975,7 +1126,7 @@ async def admin_toggle_autorenew(uid: int, _: int = Depends(get_admin_user_id)):
     if not keys:
         raise HTTPException(400, "У пользователя нет ключей")
 
-    current = any(bool(k.get("auto_renew")) for k in keys)
+    current = any(bool(k["auto_renew"]) for k in keys)
 
     count = await set_user_auto_renew_all(uid, not current)
     new_state = not current
