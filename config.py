@@ -80,6 +80,31 @@ def _parse_inbound_ids(raw: str) -> list[int]:
 # (то есть все локации, которые там подключены).
 XUI_INBOUND_IDS = _parse_inbound_ids(os.getenv("XUI_INBOUND_IDS", ""))
 
+
+def _parse_inbound_remarks(raw: str) -> dict[int, str]:
+    """«1=🇫🇮 Finland,2=🇩🇪 Germany» → {1: "🇫🇮 Finland", 2: "🇩🇪 Germany"}."""
+    out: dict[int, str] = {}
+    for part in raw.split(","):
+        part = part.strip()
+        if not part or "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        try:
+            iid = int(key.strip())
+        except ValueError:
+            continue
+        value = value.strip()
+        if iid > 0 and value:
+            out[iid] = value
+    return out
+
+
+# Точные названия (remark) для локаций — например, если в панели inbound
+# назван просто «Finland» или вообще без названия: бот подставит явно.
+# Формат: «id=Название, id=Название». Необязательно — без этого бот сам
+# вешает флаг на remark по ключевым словам (Finland/Финляндия/Helsinki…).
+XUI_INBOUND_REMARKS = _parse_inbound_remarks(os.getenv("XUI_INBOUND_REMARKS", ""))
+
 # ──────────────────────────────────────────────────────────────
 # Ссылка подписки (sub-сервер 3x-ui)
 # Итоговая ссылка: https://XUI_SUB_HOST:XUI_SUB_PORT/XUI_SUB_PATH/<subId клиента>
