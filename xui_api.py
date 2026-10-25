@@ -306,10 +306,11 @@ async def create_vpn_user(
     if hours <= 0:
         raise ValueError("hours must be > 0")
 
-    # 🇫🇮 При выдаче ключа: подписка должна СРАЗУ отдаваться с правильным
-    # именем «🇫🇮 Finland_id…» — синхронизируем флаги в remark inbound'ов
-    # и шаблон имени панели. Идемпотентно (дубли внутри 30 сек отсекаются),
-    # ошибки некритичны: выдача ключа из-за них не прерывается.
+    # 🇫🇮 При выдаче ключа: подписка должна СРАЗУ отдаваться именем
+    # «🇫🇮tg8355628654-1gb» — синхронизируем remark inbound'ов (только
+    # флаг: 🇫🇮) и шаблон имени {{INBOUND}}{{EMAIL}}. Идемпотентно
+    # (дубли внутри 30 сек отсекаются), ошибки некритичны: выдача
+    # ключа из-за них не прерывается.
     try:
         await asyncio.wait_for(ensure_naming_ready(), timeout=XUI_TIMEOUT)
     except Exception as e:
@@ -872,25 +873,23 @@ async def check_suspicious_activity() -> int:
 # 🧼 Имя подключения в приложениях: чистый шаблон панели
 # ──────────────────────────────────────────────────────────────
 
-# Панель по умолчанию называет конфиги как
-# «Локация-tg7745681987-1gb|📊∞|⏳30D» — хвост с трафиком/днями лишний.
-# Старый шаблон {{EMAIL}} оставлял в имени только email клиента, из-за
-# чего в приложении пропадало название локации вместе с флагом
-# («tgid_1123123…» вместо «🇫🇮 Finland_id1123123»).
-#
-# Новый формат: <ФЛАГ+Локация>_id<telegram id>, например
-#   🇫🇮 Finland_id7745681987
-# {{INBOUND}} — remark inbound'а в панели (флаг страны вшиваем в remark,
-# см. sync_inbound_remarks), {{TELEGRAM_ID}} — tgId клиента.
-REMARK_TEMPLATE_CLEAN = "{{INBOUND}}_id{{TELEGRAM_ID}}"
+# Требуемый формат имени (по юзеру): «🇫🇮tg8355628654-1gb» —
+# ТОЛЬКО флаг + email клиента, без лишних слов и хвостов:
+#   {{INBOUND}}   = remark inbound'а = «🇫🇮» (только флаг,
+#                   см. sync_inbound_remarks)
+#   {{EMAIL}}     = email клиента    = «tg8355628654-1gb»
+#   вместе        = «🇫🇮tg8355628654-1gb»
+# Старые варианты ({{EMAIL}} сам по себе, {{INBOUND}}_id{{TELEGRAM_ID}})
+# давали либо имя без флага, либо «🇫🇮 Finland_id…» — не формат.
+REMARK_TEMPLATE_CLEAN = "{{INBOUND}}{{EMAIL}}"
 
 
 async def sync_remark_template() -> bool:
     """
     Приводит глобальный шаблон имени подключения в панели
-    (setting remarkTemplate) к виду {{INBOUND}}_id{{TELEGRAM_ID}} —
-    в приложении отображается «🇫🇮 Finland_id7745681987»: флаг и
-    название локации + id телеграма, без «|📊∞|⏳30D» и прочих добавок.
+    (setting remarkTemplate) к виду {{INBOUND}}{{EMAIL}} —
+    в приложении отображается «🇫🇮tg8355628654-1gb»: только
+    флаг страны + email клиента, без «|📊∞|⏳30D» и прочих добавок.
     Идемпотентно: если шаблон уже совпадает, ничего не делает;
     на старых панелях без такой настройки — пропускает (False).
     Карточки настроек шлём round-trip: пустые значения секретов
@@ -958,35 +957,43 @@ def _flag_for_remark(remark: str) -> str:
     return ""
 
 
-def _with_flag(text: str) -> str:
-    """«Finland» → «🇫🇮 Finland»; уже с флагом — без изменений."""
+def _flag_only(text: str) -> str:
+    """
+    Для шаблона {{INBOUND}}{{EMAIL}} remark должен быть ТОЛЬКО флагом:
+    «🇫🇮 Finland» → «🇫🇮», «Finland» → «🇫🇮», «🇫🇮» → «🇫🇮».
+    '' — страну опознать не удалось.
+    """
     text = (text or "").strip()
-    if not text or _FLAG_RE.search(text):
-        return text
-    flag = _flag_for_remark(text)
-    return f"{flag} {text}" if flag else text
+    if not text:
+        return ""
+    m = _FLAG_RE.search(text)
+    if m:
+        return m.group(0)
+    return _flag_for_remark(text)
 
 
 def _desired_remark(inbound_id: int, current: str) -> str:
     """
-    Каким remark должен стать inbound:
-    1) XUI_INBOUND_REMARKS из env задаёт точное имя (приоритет),
-       флаг к нему тоже дописывается, если его там нет;
-    2) иначе — текущий remark, но с флагом страны, если она опознана
-       («Finland» → «🇫🇮 Finland»). Без изменений, если страну
-       опознать нельзя — тогда задайте имя через env.
+    Каким remark должен стать inbound — ТОЛЬКО флагом страны,
+    чтобы шаблон {{INBOUND}}{{EMAIL}} собирал имя вида
+    «🇫🇮tg8355628654-1gb» (флаг сразу без пробела + email).
+
+    Источники: XUI_INBOUND_REMARKS из env (приоритет) или текущий
+    remark («Finland» / «🇫🇮 Finland» → «🇫🇮»). Если страна не
+    опознана — возвращаем '' (remark не трогаем); для env-override
+    без флага берём текст как есть — это явное указание юзера.
     """
     override = XUI_INBOUND_REMARKS.get(inbound_id)
     if override:
-        return _with_flag(override)
-    return _with_flag(current)
+        return _flag_only(override) or override.strip()
+    return _flag_only(current)
 
 
 async def sync_inbound_remarks() -> int:
     """
-    Проставляет флаги стран в remark inbound'ов панели (нужно, чтобы
-    шаблон имени {{INBOUND}} показывал «🇫🇮 Finland», а не «Finland»).
-    Идемпотентно: inbound'ы, чей remark уже готов, не перезаписывает.
+    Сводит remark inbound'ов панели к ТОЛЬКО флагу страны («🇫🇮») —
+    шаблон {{INBOUND}}{{EMAIL}} собирает имя «🇫🇮tg8355628654-1gb».
+    Идемпотентно: inbound'ы, чей remark уже равен флагу, не трогает.
     Возвращает число изменённых inbound'ов.
 
     Ошибки обновления отдельных inbound'ов некритичны (warning),
@@ -1014,7 +1021,7 @@ async def sync_inbound_remarks() -> int:
         if not current.strip() and iid not in XUI_INBOUND_REMARKS:
             logger.warning(
                 f"[xui] ⚠️ inbound #{iid} без названия (remark пуст) — флаг не определить. "
-                f"Задайте имя: XUI_INBOUND_REMARKS={iid}=🇫🇮 Finland"
+                f"Задайте имя: XUI_INBOUND_REMARKS={iid}=🇫🇮"
             )
             continue
         desired = _desired_remark(iid, current)
@@ -1065,9 +1072,9 @@ _ensure_naming_lock = asyncio.Lock()
 async def ensure_naming_ready(force: bool = False) -> None:
     """
     Гарантирует, что к моменту выдачи ключа панель отдаёт подписку
-    с правильным именем «🇫🇮 Finland_id7745681987»:
-      1) в remark inbound'ов вшиты флаги стран;
-      2) шаблон имени {{INBOUND}}_id{{TELEGRAM_ID}}.
+    с правильным именем «🇫🇮tg8355628654-1gb»:
+      1) remark каждого inbound'а = только флаг страны («🇫🇮»);
+      2) шаблон имени {{INBOUND}}{{EMAIL}}.
 
     Вызывается при КАЖДОЙ выдаче (create_vpn_user) — флаг нужен и
     при первом ключе после перезапуска панели, и при добавлении
@@ -1124,9 +1131,9 @@ async def warmup_and_log_panel() -> None:
         except Exception as e:
             logger.error(f"[xui] ⚠️ Не настроена ссылка подписки: {e}")
 
-        # Флаги в названиях локаций (remark inbound'ов) + шаблон имени —
+        # Флаги в remark inbound'ов + шаблон {{INBOUND}}{{EMAIL}} —
         # force обходит TTL, чтобы ПЕРВАЯ выдача после перезапуска сразу
-        # была «🇫🇮 Finland_id…», а не «Finland_id…» без флага.
+        # была «🇫🇮tg…-1gb», а не без флага.
         await ensure_naming_ready(force=True)
     except Exception as e:
         logger.warning(f"[xui] ⚠️ Панель 3x-ui недоступна при старте: {e}")
