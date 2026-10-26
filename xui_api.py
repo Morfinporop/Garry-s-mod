@@ -283,29 +283,29 @@ def build_sub_link(sub_id: str) -> str:
 
 
 # ──────────────────────────────────────────────────────────────
-# 🌍 Единый справочник стран: ключевые слова remark → (флаг, код, имя)
+# 🌍 Единый справочник стран: ключевые слова remark → (флаг, имя)
 #
 # Используется в двух местах:
-#   1) sync_inbound_remarks()   — приводит remark inbound'а к флагу
+#   1) sync_inbound_remarks()    — приводит remark inbound'а к флагу
 #      (косметика в самой панели, на имя конфига не влияет).
-#   2) _resolve_location_label() — код+имя для email клиента
+#   2) _resolve_location_label() — имя страны для email клиента
 #      (вот это как раз то, что видно в VPN-приложении).
 # ──────────────────────────────────────────────────────────────
 
-_COUNTRY_INFO: tuple[tuple[tuple[str, ...], str, str, str], ...] = (
-    # (ключевые слова в remark,                                    флаг,   код,  имя)
-    (("finland", "финлянд", "helsinki", "хельсинки"),               "🇫🇮", "fi", "Finland"),
-    (("germany", "deutsch", "герман", "франкфурт", "frankfurt", "berlin", "берлин"), "🇩🇪", "de", "Germany"),
-    (("netherlands", "нидерланд", "amsterdam", "амстердам"),        "🇳🇱", "nl", "Netherlands"),
-    (("poland", "польш", "warsaw", "варшав"),                       "🇵🇱", "pl", "Poland"),
-    (("france", "франц", "paris", "париж"),                         "🇫🇷", "fr", "France"),
-    (("sweden", "швед", "stockholm", "стокгольм"),                  "🇸🇪", "se", "Sweden"),
-    (("latvia", "латв", "riga", "рига"),                            "🇱🇻", "lv", "Latvia"),
-    (("lithuania", "литв", "vilnius", "вильнюс"),                   "🇱🇹", "lt", "Lithuania"),
-    (("estonia", "эстон", "tallinn", "таллин"),                     "🇪🇪", "ee", "Estonia"),
-    (("turkey", "турц", "istanbul", "стамбул"),                     "🇹🇷", "tr", "Turkey"),
-    (("usa", "america", "соединённ", "соединенн", "new york", "нью-йорк"), "🇺🇸", "us", "USA"),
-    (("united kingdom", "britain", "london", "лондон", "британ"),   "🇬🇧", "gb", "UK"),
+_COUNTRY_INFO: tuple[tuple[tuple[str, ...], str, str], ...] = (
+    # (ключевые слова в remark,                                    флаг,   имя)
+    (("finland", "финлянд", "helsinki", "хельсинки"),               "🇫🇮", "Finland"),
+    (("germany", "deutsch", "герман", "франкфурт", "frankfurt", "berlin", "берлин"), "🇩🇪", "Germany"),
+    (("netherlands", "нидерланд", "amsterdam", "амстердам"),        "🇳🇱", "Netherlands"),
+    (("poland", "польш", "warsaw", "варшав"),                       "🇵🇱", "Poland"),
+    (("france", "франц", "paris", "париж"),                         "🇫🇷", "France"),
+    (("sweden", "швед", "stockholm", "стокгольм"),                  "🇸🇪", "Sweden"),
+    (("latvia", "латв", "riga", "рига"),                            "🇱🇻", "Latvia"),
+    (("lithuania", "литв", "vilnius", "вильнюс"),                   "🇱🇹", "Lithuania"),
+    (("estonia", "эстон", "tallinn", "таллин"),                     "🇪🇪", "Estonia"),
+    (("turkey", "турц", "istanbul", "стамбул"),                     "🇹🇷", "Turkey"),
+    (("usa", "america", "соединённ", "соединенн", "new york", "нью-йорк"), "🇺🇸", "USA"),
+    (("united kingdom", "britain", "london", "лондон", "британ"),   "🇬🇧", "UK"),
 )
 
 _FLAG_RE = re.compile("[\U0001F1E6-\U0001F1FF]{2}")
@@ -316,7 +316,7 @@ def _flag_for_remark(remark: str) -> str:
     low = (remark or "").strip().lower()
     if not low:
         return ""
-    for keywords, flag, _code, _name in _COUNTRY_INFO:
+    for keywords, flag, _name in _COUNTRY_INFO:
         for kw in keywords:
             if kw in low:
                 return flag
@@ -340,8 +340,8 @@ def _flag_only(text: str) -> str:
 
 def _location_label(remark: str) -> str:
     """
-    Код+имя страны по тексту remark inbound'а: «Finland» / «🇫🇮 Finland» /
-    «🇫🇮» → «fiFinland». Используется как префикс email нового ключа.
+    Название страны по тексту remark inbound'а: «Finland» / «🇫🇮 Finland» /
+    «🇫🇮» → «Finland». Используется как префикс email нового ключа.
     '' — страну опознать не удалось.
     """
     text = (remark or "").strip()
@@ -350,12 +350,12 @@ def _location_label(remark: str) -> str:
     low = text.lower()
     m = _FLAG_RE.search(text)
     flag_in_text = m.group(0) if m else ""
-    for keywords, flag, code, name in _COUNTRY_INFO:
+    for keywords, flag, name in _COUNTRY_INFO:
         if flag_in_text and flag_in_text == flag:
-            return f"{code}{name}"
+            return name
         for kw in keywords:
             if kw in low:
-                return f"{code}{name}"
+                return name
     return ""
 
 
@@ -452,10 +452,10 @@ async def sync_inbound_remarks() -> int:
 # (remarkTemplate / {{INBOUND}}{{EMAIL}}) — в VPN-приложении
 # (Happ/v2rayN/INCY и т.д.) показывается ровно client.email,
 # как он есть в конфиге Xray. Поэтому локацию вшиваем прямо
-# в email при создании клиента: "fiFinland-1gb-idtg8355628654".
+# в email при создании клиента: "Finland-1gb-id8355628654".
 #
-# XUI_INBOUND_REMARKS можно задать как готовый label целиком
-# (например XUI_INBOUND_REMARKS=1=fiFinland), тогда он берётся
+# XUI_INBOUND_REMARKS можно задать как готовое название целиком
+# (например XUI_INBOUND_REMARKS=1=Finland), тогда оно берётся
 # как есть, без автоопределения по remark.
 # ──────────────────────────────────────────────────────────────
 
@@ -466,9 +466,9 @@ LOCATION_LABEL_TTL = 300.0  # 5 минут — remark локации меняе�
 
 async def _resolve_location_label() -> str:
     """
-    Label основной локации (первого inbound'а) для email нового клиента,
-    например «fiFinland». Источник — remark inbound'а (детектится по
-    таблице _COUNTRY_INFO) или явный override XUI_INBOUND_REMARKS.
+    Название основной локации (первого inbound'а) для email нового
+    клиента, например «Finland». Источник — remark inbound'а (детектится
+    по таблице _COUNTRY_INFO) или явный override XUI_INBOUND_REMARKS.
     '' — если определить не удалось (remark пуст/не распознан) —
     тогда email создаётся без локации, по старой схеме tg{id}-{n}gb.
     """
@@ -485,8 +485,8 @@ async def _resolve_location_label() -> str:
 
         override = XUI_INBOUND_REMARKS.get(primary_id)
         if override:
-            # override может быть уже готовым label ("fiFinland") или
-            # просто текстом страны ("Finland" / "🇫🇮") — пробуем оба варианта.
+            # override может быть уже готовым названием ("Finland") или
+            # просто текстом с флагом ("🇫🇮") — пробуем оба варианта.
             label = _location_label(override) or re.sub(r"\s+", "", override.strip())
         else:
             label = ""
@@ -532,10 +532,10 @@ async def create_vpn_user(
     Ссылка подписки содержит ключи всех локаций — юзер вставляет
     её в VPN-клиент (Happ / INCY / v2rayN и т.д.) и видит оба сервера.
 
-    Имя клиента: "{label}-{N}gb-idtg{telegram_id}", например
-    "fiFinland-1gb-idtg8355628654" (label — код+имя основной
-    локации, см. _resolve_location_label). Если локацию определить
-    не удалось — используется старый вид "tg{telegram_id}-{N}gb".
+    Имя клиента: "{label}-{N}gb-id{telegram_id}", например
+    "Finland-1gb-id8355628654" (label — название основной локации,
+    см. _resolve_location_label). Если локацию определить не удалось —
+    используется старый вид "tg{telegram_id}-{N}gb".
 
     У одного пользователя может быть несколько ключей, а имя в панели
     должно быть уникальным — поэтому второй ключ получает номер 2gb,
@@ -560,7 +560,7 @@ async def create_vpn_user(
         email = ""
         for attempt in range(1, 10):
             if label:
-                email = f"{label}-{attempt}gb-idtg{telegram_id}"
+                email = f"{label}-{attempt}gb-id{telegram_id}"
             else:
                 email = f"tg{telegram_id}-{attempt}gb"
             payload = {
@@ -1131,14 +1131,14 @@ async def warmup_and_log_panel() -> None:
         label = await _resolve_location_label()
         if label:
             logger.info(
-                f"[xui] ✅ Имя новых ключей: {label}-1gb-idtg<telegram_id>"
+                f"[xui] ✅ Имя новых ключей: {label}-1gb-id<telegram_id>"
             )
         else:
             logger.warning(
                 "[xui] ⚠️ Локация не определена — новые ключи будут "
-                "создаваться по старой схеме tg<id>-1gb (без 'fiFinland'). "
+                "создаваться по старой схеме tg<id>-1gb (без 'Finland'). "
                 "Задайте remark inbound'а (например «Finland») или "
-                "XUI_INBOUND_REMARKS=<id>=fiFinland в .env"
+                "XUI_INBOUND_REMARKS=<id>=Finland в .env"
             )
     except Exception as e:
         logger.warning(f"[xui] ⚠️ Панель 3x-ui недоступна при старте: {e}")
