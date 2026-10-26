@@ -283,24 +283,29 @@ def build_sub_link(sub_id: str) -> str:
 
 
 # ──────────────────────────────────────────────────────────────
-# 🏳 Флаги стран в названиях локаций (remark inbound'ов)
+# 🌍 Единый справочник стран: ключевые слова remark → (флаг, код, имя)
+#
+# Используется в двух местах:
+#   1) sync_inbound_remarks()   — приводит remark inbound'а к флагу
+#      (косметика в самой панели, на имя конфига не влияет).
+#   2) _resolve_location_label() — код+имя для email клиента
+#      (вот это как раз то, что видно в VPN-приложении).
 # ──────────────────────────────────────────────────────────────
 
-# Названия inbound'ов, из которых бот понимает, какую страну пометить.
-# Ключ — вариант написания в remark (нижний регистр), значение — флаг.
-_FLAG_BY_KEYWORD: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("finland", "финлянд", "helsinki", "хельсинки"), "🇫🇮"),
-    (("germany", "deutsch", "герман", "франкфурт", "frankfurt", "berlin", "берлин"), "🇩🇪"),
-    (("netherlands", "нидерланд", "amsterdam", "амстердам"), "🇳🇱"),
-    (("poland", "польш", "warsaw", "варшав"), "🇵🇱"),
-    (("france", "франц", "paris", "париж"), "🇫🇷"),
-    (("sweden", "швед", "stockholm", "стокгольм"), "🇸🇪"),
-    (("latvia", "латв", "riga", "рига"), "🇱🇻"),
-    (("lithuania", "литв", "vilnius", "вильнюс"), "🇱🇹"),
-    (("estonia", "эстон", "tallinn", "таллин"), "🇪🇪"),
-    (("turkey", "турц", "istanbul", "стамбул"), "🇹🇷"),
-    (("usa", "america", "соединённ", "соединенн", "new york", "нью-йорк"), "🇺🇸"),
-    (("united kingdom", "britain", "london", "лондон", "британ"), "🇬🇧"),
+_COUNTRY_INFO: tuple[tuple[tuple[str, ...], str, str, str], ...] = (
+    # (ключевые слова в remark,                                    флаг,   код,  имя)
+    (("finland", "финлянд", "helsinki", "хельсинки"),               "🇫🇮", "fi", "Finland"),
+    (("germany", "deutsch", "герман", "франкфурт", "frankfurt", "berlin", "берлин"), "🇩🇪", "de", "Germany"),
+    (("netherlands", "нидерланд", "amsterdam", "амстердам"),        "🇳🇱", "nl", "Netherlands"),
+    (("poland", "польш", "warsaw", "варшав"),                       "🇵🇱", "pl", "Poland"),
+    (("france", "франц", "paris", "париж"),                         "🇫🇷", "fr", "France"),
+    (("sweden", "швед", "stockholm", "стокгольм"),                  "🇸🇪", "se", "Sweden"),
+    (("latvia", "латв", "riga", "рига"),                            "🇱🇻", "lv", "Latvia"),
+    (("lithuania", "литв", "vilnius", "вильнюс"),                   "🇱🇹", "lt", "Lithuania"),
+    (("estonia", "эстон", "tallinn", "таллин"),                     "🇪🇪", "ee", "Estonia"),
+    (("turkey", "турц", "istanbul", "стамбул"),                     "🇹🇷", "tr", "Turkey"),
+    (("usa", "america", "соединённ", "соединенн", "new york", "нью-йорк"), "🇺🇸", "us", "USA"),
+    (("united kingdom", "britain", "london", "лондон", "британ"),   "🇬🇧", "gb", "UK"),
 )
 
 _FLAG_RE = re.compile("[\U0001F1E6-\U0001F1FF]{2}")
@@ -311,7 +316,7 @@ def _flag_for_remark(remark: str) -> str:
     low = (remark or "").strip().lower()
     if not low:
         return ""
-    for keywords, flag in _FLAG_BY_KEYWORD:
+    for keywords, flag, _code, _name in _COUNTRY_INFO:
         for kw in keywords:
             if kw in low:
                 return flag
@@ -333,10 +338,32 @@ def _flag_only(text: str) -> str:
     return _flag_for_remark(text)
 
 
+def _location_label(remark: str) -> str:
+    """
+    Код+имя страны по тексту remark inbound'а: «Finland» / «🇫🇮 Finland» /
+    «🇫🇮» → «fiFinland». Используется как префикс email нового ключа.
+    '' — страну опознать не удалось.
+    """
+    text = (remark or "").strip()
+    if not text:
+        return ""
+    low = text.lower()
+    m = _FLAG_RE.search(text)
+    flag_in_text = m.group(0) if m else ""
+    for keywords, flag, code, name in _COUNTRY_INFO:
+        if flag_in_text and flag_in_text == flag:
+            return f"{code}{name}"
+        for kw in keywords:
+            if kw in low:
+                return f"{code}{name}"
+    return ""
+
+
 def _desired_remark(inbound_id: int, current: str) -> str:
     """
-    Каким remark должен стать inbound — ТОЛЬКО флагом страны («🇫🇮»),
-    чтобы названия локаций в панели были компактными и единообразными.
+    Каким remark должен стать inbound в самой панели — ТОЛЬКО флагом
+    страны («🇫🇮»), просто для аккуратности списка локаций.
+    На имя конфига в VPN-приложении это НЕ влияет (см. _resolve_location_label).
 
     Источники: XUI_INBOUND_REMARKS из env (приоритет) или текущий
     remark («Finland» / «🇫🇮 Finland» → «🇫🇮»). Если страна не
@@ -359,11 +386,10 @@ async def sync_inbound_remarks() -> int:
     ВАЖНО: на имя конфига в VPN-приложении (Happ/v2rayN и т.п.) это
     НЕ влияет — эта версия 3x-ui не поддерживает глобальный шаблон
     имени подписки, в приложении показывается ровно client.email.
-    За флаг в имени конфига отвечает _resolve_flag_prefix() ниже.
+    За имя конфига отвечает _resolve_location_label() ниже.
 
     Ошибки обновления отдельных inbound'ов некритичны (warning),
-    а недоступность списка — кидает исключение (вызывающий код
-    это уже обрабатывает отдельно).
+    а недоступность списка — кидает исключение.
     """
     try:
         items = await _panel_call("GET", "panel/api/inbounds/list")
@@ -384,8 +410,8 @@ async def sync_inbound_remarks() -> int:
         current = str(item.get("remark") or "")
         if not current.strip() and iid not in XUI_INBOUND_REMARKS:
             logger.warning(
-                f"[xui] ⚠️ inbound #{iid} без названия (remark пуст) — флаг не определить. "
-                f"Задайте имя: XUI_INBOUND_REMARKS={iid}=🇫🇮"
+                f"[xui] ⚠️ inbound #{iid} без названия (remark пуст) — страну не определить. "
+                f"Задайте имя: XUI_INBOUND_REMARKS={iid}=🇫🇮 или «Finland»"
             )
             continue
         desired = _desired_remark(iid, current)
@@ -420,44 +446,50 @@ async def sync_inbound_remarks() -> int:
 
 
 # ──────────────────────────────────────────────────────────────
-# 🏳 Флаг в email клиента
+# 🏷 Имя конфига в email клиента
 #
 # В этой версии 3x-ui НЕТ глобального шаблона имени подписки
 # (remarkTemplate / {{INBOUND}}{{EMAIL}}) — в VPN-приложении
 # (Happ/v2rayN/INCY и т.д.) показывается ровно client.email,
-# как он есть в конфиге Xray. Поэтому единственный способ получить
-# «🇫🇮tg8355628654-1gb» в интерфейсе приложения — физически
-# записать флаг в начало email при создании клиента.
+# как он есть в конфиге Xray. Поэтому локацию вшиваем прямо
+# в email при создании клиента: "fiFinland-1gb-idtg8355628654".
+#
+# XUI_INBOUND_REMARKS можно задать как готовый label целиком
+# (например XUI_INBOUND_REMARKS=1=fiFinland), тогда он берётся
+# как есть, без автоопределения по remark.
 # ──────────────────────────────────────────────────────────────
 
-_flag_prefix_cache: str | None = None
-_flag_prefix_cache_at: float = 0.0
-FLAG_PREFIX_TTL = 300.0  # 5 минут — remark локации меняется редко
+_location_label_cache: str | None = None
+_location_label_cache_at: float = 0.0
+LOCATION_LABEL_TTL = 300.0  # 5 минут — remark локации меняется редко
 
 
-async def _resolve_flag_prefix() -> str:
+async def _resolve_location_label() -> str:
     """
-    Флаг основной локации (первого inbound'а) для префикса email нового
-    клиента. Источник — remark inbound'а или явный override
-    XUI_INBOUND_REMARKS. '' — если флаг определить не удалось (remark
-    пуст/не распознан) — тогда email создаётся без флага.
+    Label основной локации (первого inbound'а) для email нового клиента,
+    например «fiFinland». Источник — remark inbound'а (детектится по
+    таблице _COUNTRY_INFO) или явный override XUI_INBOUND_REMARKS.
+    '' — если определить не удалось (remark пуст/не распознан) —
+    тогда email создаётся без локации, по старой схеме tg{id}-{n}gb.
     """
-    global _flag_prefix_cache, _flag_prefix_cache_at
+    global _location_label_cache, _location_label_cache_at
     now = time.monotonic()
-    if _flag_prefix_cache is not None and (now - _flag_prefix_cache_at) < FLAG_PREFIX_TTL:
-        return _flag_prefix_cache
+    if _location_label_cache is not None and (now - _location_label_cache_at) < LOCATION_LABEL_TTL:
+        return _location_label_cache
 
     try:
         inbound_ids = await _resolve_inbound_ids()
         if not inbound_ids:
-            return _flag_prefix_cache or ""
+            return _location_label_cache or ""
         primary_id = inbound_ids[0]
 
         override = XUI_INBOUND_REMARKS.get(primary_id)
         if override:
-            flag = _flag_only(override) or ""
+            # override может быть уже готовым label ("fiFinland") или
+            # просто текстом страны ("Finland" / "🇫🇮") — пробуем оба варианта.
+            label = _location_label(override) or re.sub(r"\s+", "", override.strip())
         else:
-            flag = ""
+            label = ""
             items = await _panel_call("GET", "panel/api/inbounds/list")
             for item in items or []:
                 if not isinstance(item, dict):
@@ -467,21 +499,21 @@ async def _resolve_flag_prefix() -> str:
                 except (TypeError, ValueError):
                     continue
                 if iid == primary_id:
-                    flag = _flag_only(str(item.get("remark") or ""))
+                    label = _location_label(str(item.get("remark") or ""))
                     break
 
-        _flag_prefix_cache = flag
-        _flag_prefix_cache_at = now
-        return flag
+        _location_label_cache = label
+        _location_label_cache_at = now
+        return label
     except Exception as e:
-        logger.warning(f"[xui] не удалось определить флаг локации для email: {e}")
-        return _flag_prefix_cache or ""
+        logger.warning(f"[xui] не удалось определить локацию для email: {e}")
+        return _location_label_cache or ""
 
 
-def invalidate_flag_prefix_cache() -> None:
-    global _flag_prefix_cache, _flag_prefix_cache_at
-    _flag_prefix_cache = None
-    _flag_prefix_cache_at = 0.0
+def invalidate_location_label_cache() -> None:
+    global _location_label_cache, _location_label_cache_at
+    _location_label_cache = None
+    _location_label_cache_at = 0.0
 
 
 # ──────────────────────────────────────────────────────────────
@@ -500,12 +532,14 @@ async def create_vpn_user(
     Ссылка подписки содержит ключи всех локаций — юзер вставляет
     её в VPN-клиент (Happ / INCY / v2rayN и т.д.) и видит оба сервера.
 
-    Имя клиента короткое и читаемое: 🇫🇮tg{telegram_id}-1gb (флаг —
-    страна основной локации, вшит прямо в email, см. _resolve_flag_prefix).
+    Имя клиента: "{label}-{N}gb-idtg{telegram_id}", например
+    "fiFinland-1gb-idtg8355628654" (label — код+имя основной
+    локации, см. _resolve_location_label). Если локацию определить
+    не удалось — используется старый вид "tg{telegram_id}-{N}gb".
+
     У одного пользователя может быть несколько ключей, а имя в панели
-    должно быть уникальным — поэтому второй ключ получает
-    🇫🇮tg{telegram_id}-2gb, третий -3gb (панель отвечает Duplicate email —
-    перебираем номер).
+    должно быть уникальным — поэтому второй ключ получает номер 2gb,
+    третий — 3gb (панель отвечает Duplicate email — перебираем номер).
     """
     if hours <= 0:
         raise ValueError("hours must be > 0")
@@ -521,11 +555,14 @@ async def create_vpn_user(
         if not inbound_ids:
             raise RuntimeError("В панели 3x-ui не найдено ни одной локации (inbound)")
 
-        flag_prefix = await asyncio.wait_for(_resolve_flag_prefix(), timeout=XUI_TIMEOUT)
+        label = await asyncio.wait_for(_resolve_location_label(), timeout=XUI_TIMEOUT)
 
         email = ""
         for attempt in range(1, 10):
-            email = f"{flag_prefix}tg{telegram_id}-{attempt}gb"
+            if label:
+                email = f"{label}-{attempt}gb-idtg{telegram_id}"
+            else:
+                email = f"tg{telegram_id}-{attempt}gb"
             payload = {
                 "client": {
                     "email": email,
@@ -1091,15 +1128,17 @@ async def warmup_and_log_panel() -> None:
         except Exception as e:
             logger.warning(f"[xui] ⚠️ remark локаций не обновлён при старте: {e}")
 
-        flag = await _resolve_flag_prefix()
-        if flag:
-            logger.info(f"[xui] ✅ Флаг для новых email клиентов: «{flag}»")
+        label = await _resolve_location_label()
+        if label:
+            logger.info(
+                f"[xui] ✅ Имя новых ключей: {label}-1gb-idtg<telegram_id>"
+            )
         else:
             logger.warning(
-                "[xui] ⚠️ Флаг локации не определён — новые ключи будут "
-                "создаваться БЕЗ флага в имени (tg123-1gb вместо 🇫🇮tg123-1gb). "
+                "[xui] ⚠️ Локация не определена — новые ключи будут "
+                "создаваться по старой схеме tg<id>-1gb (без 'fiFinland'). "
                 "Задайте remark inbound'а (например «Finland») или "
-                "XUI_INBOUND_REMARKS=<id>=🇫🇮 в .env"
+                "XUI_INBOUND_REMARKS=<id>=fiFinland в .env"
             )
     except Exception as e:
         logger.warning(f"[xui] ⚠️ Панель 3x-ui недоступна при старте: {e}")
