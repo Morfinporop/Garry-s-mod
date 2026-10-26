@@ -283,6 +283,208 @@ def build_sub_link(sub_id: str) -> str:
 
 
 # ──────────────────────────────────────────────────────────────
+# 🏳 Флаги стран в названиях локаций (remark inbound'ов)
+# ──────────────────────────────────────────────────────────────
+
+# Названия inbound'ов, из которых бот понимает, какую страну пометить.
+# Ключ — вариант написания в remark (нижний регистр), значение — флаг.
+_FLAG_BY_KEYWORD: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("finland", "финлянд", "helsinki", "хельсинки"), "🇫🇮"),
+    (("germany", "deutsch", "герман", "франкфурт", "frankfurt", "berlin", "берлин"), "🇩🇪"),
+    (("netherlands", "нидерланд", "amsterdam", "амстердам"), "🇳🇱"),
+    (("poland", "польш", "warsaw", "варшав"), "🇵🇱"),
+    (("france", "франц", "paris", "париж"), "🇫🇷"),
+    (("sweden", "швед", "stockholm", "стокгольм"), "🇸🇪"),
+    (("latvia", "латв", "riga", "рига"), "🇱🇻"),
+    (("lithuania", "литв", "vilnius", "вильнюс"), "🇱🇹"),
+    (("estonia", "эстон", "tallinn", "таллин"), "🇪🇪"),
+    (("turkey", "турц", "istanbul", "стамбул"), "🇹🇷"),
+    (("usa", "america", "соединённ", "соединенн", "new york", "нью-йорк"), "🇺🇸"),
+    (("united kingdom", "britain", "london", "лондон", "британ"), "🇬🇧"),
+)
+
+_FLAG_RE = re.compile("[\U0001F1E6-\U0001F1FF]{2}")
+
+
+def _flag_for_remark(remark: str) -> str:
+    """Определяет флаг страны по тексту remark. '' — не опознано."""
+    low = (remark or "").strip().lower()
+    if not low:
+        return ""
+    for keywords, flag in _FLAG_BY_KEYWORD:
+        for kw in keywords:
+            if kw in low:
+                return flag
+    return ""
+
+
+def _flag_only(text: str) -> str:
+    """
+    Достаёт из текста remark только флаг страны:
+    «🇫🇮 Finland» → «🇫🇮», «Finland» → «🇫🇮», «🇫🇮» → «🇫🇮».
+    '' — страну опознать не удалось.
+    """
+    text = (text or "").strip()
+    if not text:
+        return ""
+    m = _FLAG_RE.search(text)
+    if m:
+        return m.group(0)
+    return _flag_for_remark(text)
+
+
+def _desired_remark(inbound_id: int, current: str) -> str:
+    """
+    Каким remark должен стать inbound — ТОЛЬКО флагом страны («🇫🇮»),
+    чтобы названия локаций в панели были компактными и единообразными.
+
+    Источники: XUI_INBOUND_REMARKS из env (приоритет) или текущий
+    remark («Finland» / «🇫🇮 Finland» → «🇫🇮»). Если страна не
+    опознана — возвращаем '' (remark не трогаем); для env-override
+    без флага берём текст как есть — это явное указание юзера.
+    """
+    override = XUI_INBOUND_REMARKS.get(inbound_id)
+    if override:
+        return _flag_only(override) or override.strip()
+    return _flag_only(current)
+
+
+async def sync_inbound_remarks() -> int:
+    """
+    Сводит remark inbound'ов панели к ТОЛЬКО флагу страны («🇫🇮») —
+    просто для аккуратности списка локаций в самой панели.
+    Идемпотентно: inbound'ы, чей remark уже равен флагу, не трогает.
+    Возвращает число изменённых inbound'ов.
+
+    ВАЖНО: на имя конфига в VPN-приложении (Happ/v2rayN и т.п.) это
+    НЕ влияет — эта версия 3x-ui не поддерживает глобальный шаблон
+    имени подписки, в приложении показывается ровно client.email.
+    За флаг в имени конфига отвечает _resolve_flag_prefix() ниже.
+
+    Ошибки обновления отдельных inbound'ов некритичны (warning),
+    а недоступность списка — кидает исключение (вызывающий код
+    это уже обрабатывает отдельно).
+    """
+    try:
+        items = await _panel_call("GET", "panel/api/inbounds/list")
+    except Exception as e:
+        logger.warning(f"[xui] sync_inbound_remarks: список inbound'ов недоступен: {e}")
+        raise
+    if not isinstance(items, list):
+        return 0
+
+    changed = 0
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        try:
+            iid = int(item.get("id"))
+        except (TypeError, ValueError):
+            continue
+        current = str(item.get("remark") or "")
+        if not current.strip() and iid not in XUI_INBOUND_REMARKS:
+            logger.warning(
+                f"[xui] ⚠️ inbound #{iid} без названия (remark пуст) — флаг не определить. "
+                f"Задайте имя: XUI_INBOUND_REMARKS={iid}=🇫🇮"
+            )
+            continue
+        desired = _desired_remark(iid, current)
+        if not desired or desired == current:
+            continue
+
+        try:
+            # update требует полную карточку inbound'а — забираем и
+            # отдаём обратно, меняя только remark.
+            detail = await _panel_call("GET", f"panel/api/inbounds/get/{iid}")
+            if isinstance(detail, dict) and isinstance(detail.get("inbound"), dict):
+                detail = detail["inbound"]
+            if not isinstance(detail, dict):
+                logger.warning(f"[xui] sync_inbound_remarks: inbound #{iid}: пустая карточка")
+                continue
+            # Некоторые версии панели отдают settings/sniffing объектом,
+            # а update ждёт JSON-строку — приводим к строке.
+            for key in ("settings", "streamSettings", "sniffing"):
+                val = detail.get(key)
+                if isinstance(val, (dict, list)):
+                    detail[key] = json.dumps(val, ensure_ascii=False)
+            detail["remark"] = desired
+            await _panel_call("POST", f"panel/api/inbounds/update/{iid}", detail)
+            logger.info(f"[xui] remark inbound #{iid}: «{current}» → «{desired}»")
+            changed += 1
+        except Exception as e:
+            logger.warning(f"[xui] sync_inbound_remarks: inbound #{iid} не обновлён: {e}")
+
+    if changed:
+        logger.info(f"[xui] 🏳 Обновлены названия локаций: {changed}")
+    return changed
+
+
+# ──────────────────────────────────────────────────────────────
+# 🏳 Флаг в email клиента
+#
+# В этой версии 3x-ui НЕТ глобального шаблона имени подписки
+# (remarkTemplate / {{INBOUND}}{{EMAIL}}) — в VPN-приложении
+# (Happ/v2rayN/INCY и т.д.) показывается ровно client.email,
+# как он есть в конфиге Xray. Поэтому единственный способ получить
+# «🇫🇮tg8355628654-1gb» в интерфейсе приложения — физически
+# записать флаг в начало email при создании клиента.
+# ──────────────────────────────────────────────────────────────
+
+_flag_prefix_cache: str | None = None
+_flag_prefix_cache_at: float = 0.0
+FLAG_PREFIX_TTL = 300.0  # 5 минут — remark локации меняется редко
+
+
+async def _resolve_flag_prefix() -> str:
+    """
+    Флаг основной локации (первого inbound'а) для префикса email нового
+    клиента. Источник — remark inbound'а или явный override
+    XUI_INBOUND_REMARKS. '' — если флаг определить не удалось (remark
+    пуст/не распознан) — тогда email создаётся без флага.
+    """
+    global _flag_prefix_cache, _flag_prefix_cache_at
+    now = time.monotonic()
+    if _flag_prefix_cache is not None and (now - _flag_prefix_cache_at) < FLAG_PREFIX_TTL:
+        return _flag_prefix_cache
+
+    try:
+        inbound_ids = await _resolve_inbound_ids()
+        if not inbound_ids:
+            return _flag_prefix_cache or ""
+        primary_id = inbound_ids[0]
+
+        override = XUI_INBOUND_REMARKS.get(primary_id)
+        if override:
+            flag = _flag_only(override) or ""
+        else:
+            flag = ""
+            items = await _panel_call("GET", "panel/api/inbounds/list")
+            for item in items or []:
+                if not isinstance(item, dict):
+                    continue
+                try:
+                    iid = int(item.get("id"))
+                except (TypeError, ValueError):
+                    continue
+                if iid == primary_id:
+                    flag = _flag_only(str(item.get("remark") or ""))
+                    break
+
+        _flag_prefix_cache = flag
+        _flag_prefix_cache_at = now
+        return flag
+    except Exception as e:
+        logger.warning(f"[xui] не удалось определить флаг локации для email: {e}")
+        return _flag_prefix_cache or ""
+
+
+def invalidate_flag_prefix_cache() -> None:
+    global _flag_prefix_cache, _flag_prefix_cache_at
+    _flag_prefix_cache = None
+    _flag_prefix_cache_at = 0.0
+
+
+# ──────────────────────────────────────────────────────────────
 # 🗝 Операции с клиентами
 # ──────────────────────────────────────────────────────────────
 
@@ -298,23 +500,15 @@ async def create_vpn_user(
     Ссылка подписки содержит ключи всех локаций — юзер вставляет
     её в VPN-клиент (Happ / INCY / v2rayN и т.д.) и видит оба сервера.
 
-    Имя клиента короткое и читаемое: tg{telegram_id}-1gb. У одного
-    пользователя может быть несколько ключей, а имя в панели должно
-    быть уникальным — поэтому второй ключ получает tg{telegram_id}-2gb,
-    третий -3gb (панель отвечает Duplicate email — перебираем номер).
+    Имя клиента короткое и читаемое: 🇫🇮tg{telegram_id}-1gb (флаг —
+    страна основной локации, вшит прямо в email, см. _resolve_flag_prefix).
+    У одного пользователя может быть несколько ключей, а имя в панели
+    должно быть уникальным — поэтому второй ключ получает
+    🇫🇮tg{telegram_id}-2gb, третий -3gb (панель отвечает Duplicate email —
+    перебираем номер).
     """
     if hours <= 0:
         raise ValueError("hours must be > 0")
-
-    # 🇫🇮 При выдаче ключа: подписка должна СРАЗУ отдаваться именем
-    # «🇫🇮tg8355628654-1gb» — синхронизируем remark inbound'ов (только
-    # флаг: 🇫🇮) и шаблон имени {{INBOUND}}{{EMAIL}}. Идемпотентно
-    # (дубли внутри 30 сек отсекаются), ошибки некритичны: выдача
-    # ключа из-за них не прерывается.
-    try:
-        await asyncio.wait_for(ensure_naming_ready(), timeout=XUI_TIMEOUT)
-    except Exception as e:
-        logger.warning(f"[xui] 🏳 имя конфига не синхронизировано (некритично): {e}")
 
     client_uuid = str(uuid.uuid4())
     sub_id = _generate_sub_id()
@@ -327,9 +521,11 @@ async def create_vpn_user(
         if not inbound_ids:
             raise RuntimeError("В панели 3x-ui не найдено ни одной локации (inbound)")
 
+        flag_prefix = await asyncio.wait_for(_resolve_flag_prefix(), timeout=XUI_TIMEOUT)
+
         email = ""
         for attempt in range(1, 10):
-            email = f"tg{telegram_id}-{attempt}gb"
+            email = f"{flag_prefix}tg{telegram_id}-{attempt}gb"
             payload = {
                 "client": {
                     "email": email,
@@ -870,249 +1066,8 @@ async def check_suspicious_activity() -> int:
 
 
 # ──────────────────────────────────────────────────────────────
-# 🧼 Имя подключения в приложениях: чистый шаблон панели
-# ──────────────────────────────────────────────────────────────
-
-# Требуемый формат имени (по юзеру): «🇫🇮tg8355628654-1gb» —
-# ТОЛЬКО флаг + email клиента, без лишних слов и хвостов:
-#   {{INBOUND}}   = remark inbound'а = «🇫🇮» (только флаг,
-#                   см. sync_inbound_remarks)
-#   {{EMAIL}}     = email клиента    = «tg8355628654-1gb»
-#   вместе        = «🇫🇮tg8355628654-1gb»
-# Старые варианты ({{EMAIL}} сам по себе, {{INBOUND}}_id{{TELEGRAM_ID}})
-# давали либо имя без флага, либо «🇫🇮 Finland_id…» — не формат.
-REMARK_TEMPLATE_CLEAN = "{{INBOUND}}{{EMAIL}}"
-
-
-async def sync_remark_template() -> bool:
-    """
-    Приводит глобальный шаблон имени подключения в панели
-    (setting remarkTemplate) к виду {{INBOUND}}{{EMAIL}} —
-    в приложении отображается «🇫🇮tg8355628654-1gb»: только
-    флаг страны + email клиента, без «|📊∞|⏳30D» и прочих добавок.
-    Идемпотентно: если шаблон уже совпадает, ничего не делает;
-    на старых панелях без такой настройки — пропускает (False).
-    Карточки настроек шлём round-trip: пустые значения секретов
-    панель трактует как «не менять», остальное не трогаем.
-    Транспортные ошибки (панель недоступна/упала) — исключение,
-    чтобы ensure_naming_ready знал: синхронизация не состоялась
-    и её нужно повторить при следующей выдаче.
-    """
-    try:
-        obj = await _panel_call("POST", "panel/api/setting/all", {})
-    except Exception as e:
-        logger.warning(f"[xui] sync_remark_template: настройки недоступны: {e}")
-        raise
-    if not isinstance(obj, dict) or "remarkTemplate" not in obj:
-        logger.info("[xui] remarkTemplate: настройки панели без шаблона имени — пропуск")
-        return False
-
-    current = str(obj.get("remarkTemplate") or "")
-    if current == REMARK_TEMPLATE_CLEAN:
-        return True  # уже чистый — панель не трогаем
-
-    obj["remarkTemplate"] = REMARK_TEMPLATE_CLEAN
-    try:
-        await _panel_call("POST", "panel/api/setting/update", obj)
-    except Exception as e:
-        logger.warning(f"[xui] sync_remark_template: шаблон не применён: {e}")
-        raise
-    logger.info(f"[xui] шаблон имени подключения почищен: «{current}» → «{REMARK_TEMPLATE_CLEAN}»")
-    return True
-
-
-# ──────────────────────────────────────────────────────────────
-# 🏳 Флаги стран в названиях локаций (remark inbound'ов)
-# ──────────────────────────────────────────────────────────────
-
-# Названия inbound'ов, из которых бот понимает, какую страну пометить.
-# Ключ — вариант написания в remark (нижний регистр), значение — флаг.
-_FLAG_BY_KEYWORD: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("finland", "финлянд", "helsinki", "хельсинки"), "🇫🇮"),
-    (("germany", "deutsch", "герман", "франкфурт", "frankfurt", "berlin", "берлин"), "🇩🇪"),
-    (("netherlands", "нидерланд", "amsterdam", "амстердам"), "🇳🇱"),
-    (("poland", "польш", "warsaw", "варшав"), "🇵🇱"),
-    (("france", "франц", "paris", "париж"), "🇫🇷"),
-    (("sweden", "швед", "stockholm", "стокгольм"), "🇸🇪"),
-    (("latvia", "латв", "riga", "рига"), "🇱🇻"),
-    (("lithuania", "литв", "vilnius", "вильнюс"), "🇱🇹"),
-    (("estonia", "эстон", "tallinn", "таллин"), "🇪🇪"),
-    (("turkey", "турц", "istanbul", "стамбул"), "🇹🇷"),
-    (("usa", "america", "соединённ", "соединенн", "new york", "нью-йорк"), "🇺🇸"),
-    (("united kingdom", "britain", "london", "лондон", "британ"), "🇬🇧"),
-)
-
-_FLAG_RE = re.compile("[\U0001F1E6-\U0001F1FF]{2}")
-
-
-def _flag_for_remark(remark: str) -> str:
-    """Определяет флаг страны по тексту remark. '' — не опознано."""
-    low = (remark or "").strip().lower()
-    if not low:
-        return ""
-    for keywords, flag in _FLAG_BY_KEYWORD:
-        for kw in keywords:
-            if kw in low:
-                return flag
-    return ""
-
-
-def _flag_only(text: str) -> str:
-    """
-    Для шаблона {{INBOUND}}{{EMAIL}} remark должен быть ТОЛЬКО флагом:
-    «🇫🇮 Finland» → «🇫🇮», «Finland» → «🇫🇮», «🇫🇮» → «🇫🇮».
-    '' — страну опознать не удалось.
-    """
-    text = (text or "").strip()
-    if not text:
-        return ""
-    m = _FLAG_RE.search(text)
-    if m:
-        return m.group(0)
-    return _flag_for_remark(text)
-
-
-def _desired_remark(inbound_id: int, current: str) -> str:
-    """
-    Каким remark должен стать inbound — ТОЛЬКО флагом страны,
-    чтобы шаблон {{INBOUND}}{{EMAIL}} собирал имя вида
-    «🇫🇮tg8355628654-1gb» (флаг сразу без пробела + email).
-
-    Источники: XUI_INBOUND_REMARKS из env (приоритет) или текущий
-    remark («Finland» / «🇫🇮 Finland» → «🇫🇮»). Если страна не
-    опознана — возвращаем '' (remark не трогаем); для env-override
-    без флага берём текст как есть — это явное указание юзера.
-    """
-    override = XUI_INBOUND_REMARKS.get(inbound_id)
-    if override:
-        return _flag_only(override) or override.strip()
-    return _flag_only(current)
-
-
-async def sync_inbound_remarks() -> int:
-    """
-    Сводит remark inbound'ов панели к ТОЛЬКО флагу страны («🇫🇮») —
-    шаблон {{INBOUND}}{{EMAIL}} собирает имя «🇫🇮tg8355628654-1gb».
-    Идемпотентно: inbound'ы, чей remark уже равен флагу, не трогает.
-    Возвращает число изменённых inbound'ов.
-
-    Ошибки обновления отдельных inbound'ов некритичны (warning),
-    а недоступность списка — КИДАЕТ исключение, чтобы вызывающий
-    код (ensure_naming_ready) знал: панель легла, синхронизация
-    не состоялась и её надо повторить при следующей выдаче.
-    """
-    try:
-        items = await _panel_call("GET", "panel/api/inbounds/list")
-    except Exception as e:
-        logger.warning(f"[xui] sync_inbound_remarks: список inbound'ов недоступен: {e}")
-        raise
-    if not isinstance(items, list):
-        return 0
-
-    changed = 0
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        try:
-            iid = int(item.get("id"))
-        except (TypeError, ValueError):
-            continue
-        current = str(item.get("remark") or "")
-        if not current.strip() and iid not in XUI_INBOUND_REMARKS:
-            logger.warning(
-                f"[xui] ⚠️ inbound #{iid} без названия (remark пуст) — флаг не определить. "
-                f"Задайте имя: XUI_INBOUND_REMARKS={iid}=🇫🇮"
-            )
-            continue
-        desired = _desired_remark(iid, current)
-        if not desired or desired == current:
-            continue
-
-        try:
-            # update требует полную карточку inbound'а — забираем и
-            # отдаём обратно, меняя только remark.
-            detail = await _panel_call("GET", f"panel/api/inbounds/get/{iid}")
-            if isinstance(detail, dict) and isinstance(detail.get("inbound"), dict):
-                detail = detail["inbound"]
-            if not isinstance(detail, dict):
-                logger.warning(f"[xui] sync_inbound_remarks: inbound #{iid}: пустая карточка")
-                continue
-            # Некоторые версии панели отдают settings/sniffing объектом,
-            # а update ждёт JSON-строку — приводим к строке.
-            for key in ("settings", "streamSettings", "sniffing"):
-                val = detail.get(key)
-                if isinstance(val, (dict, list)):
-                    detail[key] = json.dumps(val, ensure_ascii=False)
-            detail["remark"] = desired
-            await _panel_call("POST", f"panel/api/inbounds/update/{iid}", detail)
-            logger.info(f"[xui] remark inbound #{iid}: «{current}» → «{desired}»")
-            changed += 1
-        except Exception as e:
-            logger.warning(f"[xui] sync_inbound_remarks: inbound #{iid} не обновлён: {e}")
-
-    if changed:
-        logger.info(f"[xui] 🏳 Обновлены названия локаций: {changed}")
-    return changed
-
-
-# ──────────────────────────────────────────────────────────────
-# 🏳 Гарантия имени при выдаче ключа
-# ──────────────────────────────────────────────────────────────
-
-# При массовой выдаче (несколько ключей подряд) панель дёргаем
-# не чаще раза в ENSURE_NAMING_TTL секунд — sync идемпотентен,
-# и в обычном состоянии это всего два лёгких чтения.
-ENSURE_NAMING_TTL = 30.0
-# -inf, а не 0.0: у свежеподнятого процесса time.monotonic() мал,
-# и метка 0.0 давала бы ложный «TTL ещё действует» до 30-й секунды.
-_ensure_naming_at = float("-inf")
-_ensure_naming_lock = asyncio.Lock()
-
-
-async def ensure_naming_ready(force: bool = False) -> None:
-    """
-    Гарантирует, что к моменту выдачи ключа панель отдаёт подписку
-    с правильным именем «🇫🇮tg8355628654-1gb»:
-      1) remark каждого inbound'а = только флаг страны («🇫🇮»);
-      2) шаблон имени {{INBOUND}}{{EMAIL}}.
-
-    Вызывается при КАЖДОЙ выдаче (create_vpn_user) — флаг нужен и
-    при первом ключе после перезапуска панели, и при добавлении
-    новой локации после старта бота. Идемпотентно: если всё уже
-    на месте — только чтения (список inbound'ов + настройки),
-    записей и рестартов нет. Ошибки некритичны и выдачу не рвут.
-    """
-    global _ensure_naming_at
-
-    if not XUI_HOST:
-        return
-    now = time.monotonic()
-    if not force and (now - _ensure_naming_at) < ENSURE_NAMING_TTL:
-        return
-
-    async with _ensure_naming_lock:
-        now = time.monotonic()
-        if not force and (now - _ensure_naming_at) < ENSURE_NAMING_TTL:
-            return
-        try:
-            changed = await sync_inbound_remarks()
-            template_ok = await sync_remark_template()
-        except Exception as e:
-            # Метку времени не двигаем — повторим при следующей выдаче.
-            logger.warning(f"[xui] 🏳 синхронизация имени не удалась (некритично): {e}")
-            return
-        if changed:
-            logger.info(f"[xui] 🏳 при выдаче: флаг добавлен в {changed} локаций")
-        if not template_ok:
-            logger.warning(
-                "[xui] 🏳 шаблон имени подключения не подтверждён — "
-                "в приложении имя может отображаться без «🇫🇮» (см. лог выше)"
-            )
-        _ensure_naming_at = time.monotonic()
-
-
-# ──────────────────────────────────────────────────────────────
-# 🚀 Проверка при старте: логируем локации и шаблон подписки
+# 🚀 Проверка при старте: логируем локации и приводим в порядок
+# названия локаций (remark) в самой панели
 # ──────────────────────────────────────────────────────────────
 
 async def warmup_and_log_panel() -> None:
@@ -1131,9 +1086,20 @@ async def warmup_and_log_panel() -> None:
         except Exception as e:
             logger.error(f"[xui] ⚠️ Не настроена ссылка подписки: {e}")
 
-        # Флаги в remark inbound'ов + шаблон {{INBOUND}}{{EMAIL}} —
-        # force обходит TTL, чтобы ПЕРВАЯ выдача после перезапуска сразу
-        # была «🇫🇮tg…-1gb», а не без флага.
-        await ensure_naming_ready(force=True)
+        try:
+            await sync_inbound_remarks()
+        except Exception as e:
+            logger.warning(f"[xui] ⚠️ remark локаций не обновлён при старте: {e}")
+
+        flag = await _resolve_flag_prefix()
+        if flag:
+            logger.info(f"[xui] ✅ Флаг для новых email клиентов: «{flag}»")
+        else:
+            logger.warning(
+                "[xui] ⚠️ Флаг локации не определён — новые ключи будут "
+                "создаваться БЕЗ флага в имени (tg123-1gb вместо 🇫🇮tg123-1gb). "
+                "Задайте remark inbound'а (например «Finland») или "
+                "XUI_INBOUND_REMARKS=<id>=🇫🇮 в .env"
+            )
     except Exception as e:
         logger.warning(f"[xui] ⚠️ Панель 3x-ui недоступна при старте: {e}")
